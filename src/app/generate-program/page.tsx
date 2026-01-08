@@ -2,56 +2,83 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useAction, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { formatAllPrompts } from "./formatPrompts";
 
 /* =======================
    Types
 ======================= */
 
-type Stage = "LANDING" | "CHARACTER" | "CHAT";
+type Stage = "LANDING" | "PROFILE" | "GOAL" | "GOAL_DETAILS" | "CONSTRAINTS" | "REVIEW";
 
-type Message = {
-    role: "assistant" | "user";
-    content: string;
+type FitnessGoal = "Lose Fat" | "Gain Muscle" | "Increase Strength" | "Improve Endurance";
+type Equipment = "Bodyweight Only" | "Dumbbells" | "Full Gym";
+
+// Goal-specific details
+type GoalDetails = {
+    // Lose Fat
+    targetWeight?: number;
+    timeframeWeeks?: number;
+
+    // Gain Muscle
+    targetMuscleGain?: number; // in pounds
+    timeframeMonths?: number;
+
+    // Increase Strength
+    targetLift?: string; // e.g., "Bench Press"
+    targetIncrease?: number; // in pounds
+
+    // Improve Endurance
+    cardioExercise?: string; // e.g., "5K Run", "10K Run"
+    targetTime?: string; // e.g., "25:00", "45:00"
 };
 
-type IntakeStep =
-    | "GOAL"
-    | "EXPERIENCE"
-    | "DAYS"
-    | "TIME"
-    | "EQUIPMENT"
-    | "DIET"
-    | "DONE";
-
 export type UserProfile = {
-    age?: number;
-    height?: number;
-    weight?: number;
-    goal?: string;
+    // Body stats
+    age: number;
+    height: number;
+    weight: number;
+
+    // Goal and constraints
+    goal: FitnessGoal;
+    goalDetails?: GoalDetails;
+    equipment?: Equipment; // Optional for Improve Endurance
+    daysPerWeek: number;
+    minutesPerSession: number;
+
+    // Optional
     experience?: string;
-    daysPerWeek?: number;
-    minutesPerSession?: number;
-    equipment?: string;
-    diet?: string;
+    dietaryRestrictions?: string;
 };
 
 /* =======================
-   Questions
+   Template Types (for future implementation)
 ======================= */
 
-const QUESTIONS: Record<IntakeStep, string> = {
-    GOAL: "What is your primary fitness goal?",
-    EXPERIENCE: "How would you describe your training experience?",
-    DAYS: "How many days per week can you train?",
-    TIME: "How many minutes per workout?",
-    EQUIPMENT: "What equipment do you have access to?",
-    DIET: "Any dietary restrictions or preferences?",
-    DONE: "Thanks! Generating your personalized program..."
+export type WorkoutPlanTemplate = {
+    schedule: string[];
+    exercises: Array<{
+        day: string;
+        routine: Array<{
+            name: string;
+            sets: number;
+            reps: number;
+            duration?: number;
+            description?: string;
+        }>;
+    }>;
+};
+
+export type MealPlanTemplate = {
+    dailyCalories: number;
+    meals: Array<{
+        name: string;
+        foods: string[];
+        calories: number;
+        instructions: string[];
+    }>;
 };
 
 /* =======================
@@ -60,8 +87,6 @@ const QUESTIONS: Record<IntakeStep, string> = {
 
 export default function GenerateProgramPage() {
     const { user } = useUser();
-    const generatePlan = useAction(api.plans.generatePlan);
-    const createPlan = useAction(api.plans.generateAndSavePlan);
 
     // Get user from database
     const dbUser = useQuery(
@@ -77,127 +102,59 @@ export default function GenerateProgramPage() {
 
     const [stage, setStage] = useState<Stage>("LANDING");
 
-    const [step, setStep] = useState<IntakeStep>("GOAL");
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [input, setInput] = useState("");
-    const [profile, setProfile] = useState<UserProfile>({});
-    const [prompts, setPrompts] = useState<{ workoutPrompt: string; mealPlanPrompt: string } | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [results, setResults] = useState<{ workoutPlan: any; mealPlan: any; planId?: string } | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    // Character builder state
+    // Profile state
     const [age, setAge] = useState(25);
     const [height, setHeight] = useState(170);
     const [weight, setWeight] = useState(70);
 
+    // Goal and constraints
+    const [selectedGoal, setSelectedGoal] = useState<FitnessGoal | null>(null);
+    const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+    const [daysPerWeek, setDaysPerWeek] = useState(4);
+    const [minutesPerSession, setMinutesPerSession] = useState(45);
+
+    // Goal-specific details
+    const [goalDetails, setGoalDetails] = useState<GoalDetails>({});
+
     /* =======================
-       Chat Logic
+       Build User Profile
     ======================= */
 
-    const startChat = () => {
-        setProfile({ age, height, weight });
-        setMessages([{ role: "assistant", content: QUESTIONS.GOAL }]);
-        setStage("CHAT");
-    };
-
-    const handleSubmit = () => {
-        if (!input.trim()) return;
-
-        setMessages((prev) => [...prev, { role: "user", content: input }]);
-
-        const nextProfile = { ...profile };
-
-        switch (step) {
-            case "GOAL":
-                nextProfile.goal = input;
-                setStep("EXPERIENCE");
-                break;
-            case "EXPERIENCE":
-                nextProfile.experience = input;
-                setStep("DAYS");
-                break;
-            case "DAYS":
-                nextProfile.daysPerWeek = Number(input);
-                setStep("TIME");
-                break;
-            case "TIME":
-                nextProfile.minutesPerSession = Number(input);
-                setStep("EQUIPMENT");
-                break;
-            case "EQUIPMENT":
-                nextProfile.equipment = input;
-                setStep("DIET");
-                break;
-            case "DIET":
-                nextProfile.diet = input;
-                setStep("DONE");
-                break;
+    const buildUserProfile = (): UserProfile | null => {
+        if (!selectedGoal) {
+            return null;
         }
 
-        setProfile(nextProfile);
-        setInput("");
+        // Improve Endurance doesn't need equipment
+        if (selectedGoal !== "Improve Endurance" && !selectedEquipment) {
+            return null;
+        }
 
-        const nextStep =
-            step === "DIET"
-                ? "DONE"
-                : (Object.keys(QUESTIONS) as IntakeStep[])[
-                (Object.keys(QUESTIONS) as IntakeStep[]).indexOf(step) + 1
-                ];
-
-        setTimeout(() => {
-            setMessages((prev) => [
-                ...prev,
-                { role: "assistant", content: QUESTIONS[nextStep] }
-            ]);
-        }, 400);
+        return {
+            age,
+            height,
+            weight,
+            goal: selectedGoal,
+            goalDetails: Object.keys(goalDetails).length > 0 ? goalDetails : undefined,
+            equipment: selectedEquipment || undefined,
+            daysPerWeek,
+            minutesPerSession,
+        };
     };
 
-    // Generate prompts and call Gemini when step is DONE
-    useEffect(() => {
-        if (step === "DONE" && profile.goal && profile.experience && !prompts && !loading && !results && dbUser) {
-            const formattedPrompts = formatAllPrompts(profile);
-            setPrompts(formattedPrompts);
+    const handleGenerate = () => {
+        const profile = buildUserProfile();
+        if (!profile) return;
 
-            // Automatically call Gemini API via Convex
-            setLoading(true);
-            setError(null);
+        // TODO: Workout generation will be handled by deterministic logic here
+        // const workoutPlan = generateWorkoutPlan(profile);
 
-            const planName = `${profile.goal} Plan - ${new Date().toLocaleDateString()}`;
+        // TODO: Meal plan generation will be handled by deterministic logic here
+        // const mealPlan = generateMealPlan(profile);
 
-            createPlan({
-                workoutPrompt: formattedPrompts.workoutPrompt,
-                mealPlanPrompt: formattedPrompts.mealPlanPrompt,
-                userID: dbUser._id,
-                planName,
-            })
-                .then((data) => {
-                    if (data.success) {
-                        setResults({
-                            workoutPlan: data.workoutPlan,
-                            mealPlan: data.dietPlan,
-                            planId: data.planId,
-                        });
-                        setMessages((prev) => [
-                            ...prev,
-                            {
-                                role: "assistant",
-                                content: "✅ Your personalized workout and meal plans have been generated and saved! Check them out below."
-                            }
-                        ]);
-                    } else {
-                        setError("Failed to generate plans");
-                    }
-                })
-                .catch((err) => {
-                    console.error("Error generating plan:", err);
-                    setError(err.message || "Failed to generate plans");
-                })
-                .finally(() => {
-                    setLoading(false);
-                });
-        }
-    }, [step, profile, prompts, loading, results, dbUser, createPlan]);
+        console.log("User Profile:", profile);
+        // For now, just log the profile - implementation will come later
+    };
 
     /* =======================
        RENDER
@@ -209,13 +166,13 @@ export default function GenerateProgramPage() {
             {stage === "LANDING" && (
                 <div className="max-w-4xl w-full space-y-6">
                     <Card className="p-8 text-center space-y-4">
-                        <h1 className="text-3xl font-bold">Your AI Fitness Coach</h1>
+                        <h1 className="text-3xl font-bold">Your Fitness Coach</h1>
                         <p className="text-muted-foreground">
                             Personalized workouts and meal plans built exactly for your body,
                             goals, and schedule.
                         </p>
-                        <Button size="lg" onClick={() => setStage("CHARACTER")}>
-                            Generate My Program
+                        <Button size="lg" onClick={() => setStage("PROFILE")}>
+                            Create My Program
                         </Button>
                     </Card>
 
@@ -252,45 +209,6 @@ export default function GenerateProgramPage() {
                                                 {plan.dietPlan.dailyCalories}
                                             </div>
                                         </div>
-                                        <details className="mt-2">
-                                            <summary className="cursor-pointer text-sm text-muted-foreground">
-                                                View Full Plan
-                                            </summary>
-                                            <div className="mt-3 space-y-4">
-                                                <div>
-                                                    <h4 className="font-semibold mb-2">💪 Workout Plan</h4>
-                                                    <div className="space-y-2">
-                                                        {plan.workoutPlan.exercises.map((exercise: any, idx: number) => (
-                                                            <div key={idx} className="border-l-2 border-primary pl-3">
-                                                                <h5 className="font-semibold">{exercise.day}</h5>
-                                                                <ul className="list-disc list-inside space-y-1 mt-1 text-sm">
-                                                                    {exercise.routine.map((routine: any, rIdx: number) => (
-                                                                        <li key={rIdx}>
-                                                                            {routine.name} - {routine.sets} sets × {routine.reps} reps
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-semibold mb-2">🍽️ Meal Plan</h4>
-                                                    <div className="space-y-2">
-                                                        {plan.dietPlan.meals.map((meal: any, idx: number) => (
-                                                            <div key={idx} className="border-l-2 border-green-500 pl-3">
-                                                                <h5 className="font-semibold">{meal.name} ({meal.calories} cal)</h5>
-                                                                <ul className="list-disc list-inside space-y-1 mt-1 text-sm">
-                                                                    {meal.foods.map((food: string, fIdx: number) => (
-                                                                        <li key={fIdx}>{food}</li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </details>
                                     </div>
                                 ))}
                             </div>
@@ -299,17 +217,16 @@ export default function GenerateProgramPage() {
                 </div>
             )}
 
-            {/* CHARACTER BUILDER */}
-            {stage === "CHARACTER" && (
+            {/* PROFILE - Body Stats */}
+            {stage === "PROFILE" && (
                 <Card className="max-w-xl w-full p-6 space-y-6">
                     <h2 className="text-xl font-bold text-center">
-                        Customize Your Body
+                        Your Body Stats
                     </h2>
 
-                    {/* Sliders */}
                     <div className="space-y-4">
                         <label className="block">
-                            Age: {age}
+                            <span className="text-sm font-medium mb-2 block">Age: {age}</span>
                             <input
                                 type="range"
                                 min={16}
@@ -321,7 +238,7 @@ export default function GenerateProgramPage() {
                         </label>
 
                         <label className="block">
-                            Height (cm): {height}
+                            <span className="text-sm font-medium mb-2 block">Height: {height} cm</span>
                             <input
                                 type="range"
                                 min={140}
@@ -333,7 +250,7 @@ export default function GenerateProgramPage() {
                         </label>
 
                         <label className="block">
-                            Weight (kg): {weight}
+                            <span className="text-sm font-medium mb-2 block">Weight: {weight} kg</span>
                             <input
                                 type="range"
                                 min={45}
@@ -345,138 +262,368 @@ export default function GenerateProgramPage() {
                         </label>
                     </div>
 
-                    <Button className="w-full" onClick={startChat}>
-                        Continue
-                    </Button>
+                    <div className="flex gap-3">
+                        <Button variant="outline" className="flex-1" onClick={() => setStage("LANDING")}>
+                            Back
+                        </Button>
+                        <Button className="flex-1" onClick={() => setStage("GOAL")}>
+                            Continue
+                        </Button>
+                    </div>
                 </Card>
             )}
 
-            {/* CHAT */}
-            {stage === "CHAT" && (
-                <Card className="max-w-3xl w-full p-6">
-                    <h2 className="text-xl font-bold mb-4 text-center">
-                        AI Fitness Intake
+            {/* GOAL SELECTION */}
+            {stage === "GOAL" && (
+                <Card className="max-w-2xl w-full p-6 space-y-6">
+                    <h2 className="text-xl font-bold text-center">
+                        What's Your Primary Goal?
                     </h2>
+                    <p className="text-center text-muted-foreground text-sm">
+                        Select one goal to focus on
+                    </p>
 
-                    <div className="h-80 overflow-y-auto border rounded-lg p-4 space-y-3 mb-4 bg-muted/30">
-                        {messages.map((m, i) => (
-                            <div key={i}>
-                                <div className="text-xs font-semibold text-muted-foreground mb-1">
-                                    {m.role === "assistant" ? "Coach" : "You"}
-                                </div>
-                                <p>{m.content}</p>
-                            </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        {(["Lose Fat", "Gain Muscle", "Increase Strength", "Improve Endurance"] as FitnessGoal[]).map((goal) => (
+                            <button
+                                key={goal}
+                                onClick={() => setSelectedGoal(goal)}
+                                className={`p-6 rounded-lg border-2 transition-all text-left ${selectedGoal === goal
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:border-primary/50"
+                                    }`}
+                            >
+                                <h3 className="font-semibold text-lg mb-2">{goal}</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    {goal === "Lose Fat" && "Burn calories and reduce body fat"}
+                                    {goal === "Gain Muscle" && "Build muscle mass and size"}
+                                    {goal === "Increase Strength" && "Get stronger with progressive overload"}
+                                    {goal === "Improve Endurance" && "Build cardiovascular fitness"}
+                                </p>
+                            </button>
                         ))}
                     </div>
 
-                    {step !== "DONE" && (
-                        <div className="flex gap-2">
+                    <div className="flex gap-3">
+                        <Button variant="outline" className="flex-1" onClick={() => setStage("PROFILE")}>
+                            Back
+                        </Button>
+                        <Button
+                            className="flex-1"
+                            onClick={() => setStage("GOAL_DETAILS")}
+                            disabled={!selectedGoal}
+                        >
+                            Continue
+                        </Button>
+                    </div>
+                </Card>
+            )}
+
+            {/* GOAL DETAILS - Follow-up questions based on selected goal */}
+            {stage === "GOAL_DETAILS" && selectedGoal && (
+                <Card className="max-w-xl w-full p-6 space-y-6">
+                    <h2 className="text-xl font-bold text-center">
+                        Tell Us More About Your Goal
+                    </h2>
+
+                    {/* Lose Fat */}
+                    {selectedGoal === "Lose Fat" && (
+                        <div className="space-y-6">
+                            <div>
+                                <label className="text-sm font-medium mb-2 block">
+                                    How much weight do you want to lose? (kg)
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    value={goalDetails.targetWeight || ""}
+                                    onChange={(e) => setGoalDetails({ ...goalDetails, targetWeight: Number(e.target.value) })}
+                                    className="w-full px-3 py-2 border rounded-lg"
+                                    placeholder="e.g., 10"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium mb-2 block">
+                                    How long do you want to achieve this? (weeks)
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[8, 12, 16, 20].map((weeks) => (
+                                        <button
+                                            key={weeks}
+                                            onClick={() => setGoalDetails({ ...goalDetails, timeframeWeeks: weeks })}
+                                            className={`p-3 rounded-lg border-2 transition-all ${goalDetails.timeframeWeeks === weeks
+                                                ? "border-primary bg-primary/10"
+                                                : "border-border hover:border-primary/50"
+                                                }`}
+                                        >
+                                            {weeks} weeks
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Gain Muscle */}
+                    {selectedGoal === "Gain Muscle" && (
+                        <div className="space-y-6">
+                            <div>
+                                <label className="text-sm font-medium mb-2 block">
+                                    How much muscle do you want to gain? (pounds)
+                                </label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    value={goalDetails.targetMuscleGain || ""}
+                                    onChange={(e) => setGoalDetails({ ...goalDetails, targetMuscleGain: Number(e.target.value) })}
+                                    className="w-full px-3 py-2 border rounded-lg"
+                                    placeholder="e.g., 15"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium mb-2 block">
+                                    How fast do you want to gain? (months)
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[3, 6, 9, 12].map((months) => (
+                                        <button
+                                            key={months}
+                                            onClick={() => setGoalDetails({ ...goalDetails, timeframeMonths: months })}
+                                            className={`p-3 rounded-lg border-2 transition-all ${goalDetails.timeframeMonths === months
+                                                ? "border-primary bg-primary/10"
+                                                : "border-border hover:border-primary/50"
+                                                }`}
+                                        >
+                                            {months} months
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Increase Strength */}
+                    {selectedGoal === "Increase Strength" && (
+                        <div className="space-y-6">
+                            <div>
+                                <label className="text-sm font-medium mb-3 block">
+                                    Which lift do you want to improve?
+                                </label>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {["Bench Press", "Squat", "Deadlift", "Overhead Press"].map((lift) => (
+                                        <button
+                                            key={lift}
+                                            onClick={() => setGoalDetails({ ...goalDetails, targetLift: lift })}
+                                            className={`p-4 rounded-lg border-2 transition-all text-left ${goalDetails.targetLift === lift
+                                                ? "border-primary bg-primary/10"
+                                                : "border-border hover:border-primary/50"
+                                                }`}
+                                        >
+                                            <span className="font-medium">{lift}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium mb-2 block">
+                                    How much do you want to add? (pounds)
+                                </label>
+                                <input
+                                    type="number"
+                                    min={5}
+                                    max={200}
+                                    step={5}
+                                    value={goalDetails.targetIncrease || ""}
+                                    onChange={(e) => setGoalDetails({ ...goalDetails, targetIncrease: Number(e.target.value) })}
+                                    className="w-full px-3 py-2 border rounded-lg"
+                                    placeholder="e.g., 20"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Improve Endurance */}
+                    {selectedGoal === "Improve Endurance" && (
+                        <div className="space-y-6">
+                            <div>
+                                <label className="text-sm font-medium mb-3 block">
+                                    What cardio exercise do you want to focus on?
+                                </label>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {["5K Run", "10K Run", "Half Marathon", "Marathon", "Cycling", "Swimming"].map((exercise) => (
+                                        <button
+                                            key={exercise}
+                                            onClick={() => setGoalDetails({ ...goalDetails, cardioExercise: exercise })}
+                                            className={`p-4 rounded-lg border-2 transition-all text-left ${goalDetails.cardioExercise === exercise
+                                                ? "border-primary bg-primary/10"
+                                                : "border-border hover:border-primary/50"
+                                                }`}
+                                        >
+                                            <span className="font-medium">{exercise}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium mb-2 block">
+                                    What's your target time? (MM:SS)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={goalDetails.targetTime || ""}
+                                    onChange={(e) => setGoalDetails({ ...goalDetails, targetTime: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-lg"
+                                    placeholder="e.g., 25:00 or 1:30:00"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Format: MM:SS for shorter distances, H:MM:SS for longer
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex gap-3">
+                        <Button variant="outline" className="flex-1" onClick={() => setStage("GOAL")}>
+                            Back
+                        </Button>
+                        <Button
+                            className="flex-1"
+                            onClick={() => setStage("CONSTRAINTS")}
+                            disabled={
+                                (selectedGoal === "Lose Fat" && (!goalDetails.targetWeight || !goalDetails.timeframeWeeks)) ||
+                                (selectedGoal === "Gain Muscle" && (!goalDetails.targetMuscleGain || !goalDetails.timeframeMonths)) ||
+                                (selectedGoal === "Increase Strength" && (!goalDetails.targetLift || !goalDetails.targetIncrease)) ||
+                                (selectedGoal === "Improve Endurance" && (!goalDetails.cardioExercise || !goalDetails.targetTime))
+                            }
+                        >
+                            Continue
+                        </Button>
+                    </div>
+                </Card>
+            )}
+
+            {/* CONSTRAINTS */}
+            {stage === "CONSTRAINTS" && (
+                <Card className="max-w-xl w-full p-6 space-y-6">
+                    <h2 className="text-xl font-bold text-center">
+                        Your Training Setup
+                    </h2>
+
+                    <div className="space-y-6">
+                        {/* Equipment Selection - Skip for Improve Endurance */}
+                        {selectedGoal !== "Improve Endurance" && (
+                            <div>
+                                <label className="text-sm font-medium mb-3 block">Available Equipment</label>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {(["Bodyweight Only", "Dumbbells", "Full Gym"] as Equipment[]).map((equip) => (
+                                        <button
+                                            key={equip}
+                                            onClick={() => setSelectedEquipment(equip)}
+                                            className={`p-4 rounded-lg border-2 transition-all text-left ${selectedEquipment === equip
+                                                ? "border-primary bg-primary/10"
+                                                : "border-border hover:border-primary/50"
+                                                }`}
+                                        >
+                                            <span className="font-medium">{equip}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Days Per Week */}
+                        <div>
+                            <label className="text-sm font-medium mb-2 block">
+                                Days Per Week: {daysPerWeek}
+                            </label>
                             <input
-                                className="flex-1 rounded-lg border px-3 py-2"
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                                type="range"
+                                min={2}
+                                max={7}
+                                value={daysPerWeek}
+                                onChange={(e) => setDaysPerWeek(Number(e.target.value))}
+                                className="w-full"
                             />
-                            <Button onClick={handleSubmit}>Send</Button>
+                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                <span>2</span>
+                                <span>7</span>
+                            </div>
                         </div>
-                    )}
 
-                    {step === "DONE" && (
-                        <div className="mt-4 space-y-4">
-                            {loading && (
-                                <div className="text-center py-4">
-                                    <p className="text-muted-foreground">
-                                        🤖 Generating your personalized workout and meal plans...
-                                    </p>
-                                </div>
-                            )}
-
-                            {error && (
-                                <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded">
-                                    <p className="font-semibold">Error:</p>
-                                    <p>{error}</p>
-                                </div>
-                            )}
-
-                            {results && (
-                                <>
-                                    {results.planId && (
-                                        <div className="bg-green-50 border border-green-200 text-green-800 p-3 rounded mb-4">
-                                            <p className="font-semibold">✅ Plan Saved Successfully!</p>
-                                            <p className="text-sm">Plan ID: {results.planId}</p>
-                                            <p className="text-sm">Your plan has been saved to the database and will appear in your saved plans.</p>
-                                        </div>
-                                    )}
-                                    <div>
-                                        <h3 className="text-lg font-semibold mb-3">💪 Your Workout Plan</h3>
-                                        <div className="bg-muted/30 border rounded-lg p-4">
-                                            <div className="mb-2">
-                                                <span className="font-semibold">Schedule: </span>
-                                                {results.workoutPlan.schedule?.join(", ")}
-                                            </div>
-                                            <div className="space-y-3 mt-4">
-                                                {results.workoutPlan.exercises?.map((exercise: any, idx: number) => (
-                                                    <div key={idx} className="border-l-2 border-primary pl-3">
-                                                        <h4 className="font-semibold">{exercise.day}</h4>
-                                                        <ul className="list-disc list-inside space-y-1 mt-1">
-                                                            {(exercise.routine || exercise.routines)?.map((routine: any, rIdx: number) => (
-                                                                <li key={rIdx}>
-                                                                    {routine.name} - {routine.sets} sets × {routine.reps} reps
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-lg font-semibold mb-3">🍽️ Your Meal Plan</h3>
-                                        <div className="bg-muted/30 border rounded-lg p-4">
-                                            <div className="mb-3">
-                                                <span className="font-semibold">Daily Calories: </span>
-                                                {results.mealPlan.dailyCalories}
-                                            </div>
-                                            <div className="space-y-2">
-                                                {results.mealPlan.meals?.map((meal: any, idx: number) => (
-                                                    <div key={idx} className="border-l-2 border-green-500 pl-3">
-                                                        <h4 className="font-semibold">{meal.name}</h4>
-                                                        <ul className="list-disc list-inside space-y-1 mt-1">
-                                                            {meal.foods?.map((food: string, fIdx: number) => (
-                                                                <li key={fIdx}>{food}</li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Show raw JSON for debugging/copying */}
-                                    <details className="mt-4">
-                                        <summary className="cursor-pointer text-sm text-muted-foreground mb-2">
-                                            View Raw JSON
-                                        </summary>
-                                        <div className="space-y-2">
-                                            <div>
-                                                <h4 className="text-xs font-semibold mb-1">Workout Plan:</h4>
-                                                <pre className="text-xs bg-black text-green-400 p-3 rounded overflow-x-auto">
-                                                    {JSON.stringify(results.workoutPlan, null, 2)}
-                                                </pre>
-                                            </div>
-                                            <div>
-                                                <h4 className="text-xs font-semibold mb-1">Meal Plan:</h4>
-                                                <pre className="text-xs bg-black text-green-400 p-3 rounded overflow-x-auto">
-                                                    {JSON.stringify(results.mealPlan, null, 2)}
-                                                </pre>
-                                            </div>
-                                        </div>
-                                    </details>
-                                </>
-                            )}
+                        {/* Minutes Per Session */}
+                        <div>
+                            <label className="text-sm font-medium mb-2 block">
+                                Minutes Per Session: {minutesPerSession}
+                            </label>
+                            <input
+                                type="range"
+                                min={20}
+                                max={120}
+                                step={5}
+                                value={minutesPerSession}
+                                onChange={(e) => setMinutesPerSession(Number(e.target.value))}
+                                className="w-full"
+                            />
+                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                                <span>20 min</span>
+                                <span>120 min</span>
+                            </div>
                         </div>
-                    )}
+                    </div>
+
+                    <div className="flex gap-3">
+                        <Button variant="outline" className="flex-1" onClick={() => setStage("GOAL_DETAILS")}>
+                            Back
+                        </Button>
+                        <Button
+                            className="flex-1"
+                            onClick={() => {
+                                setStage("REVIEW");
+                                handleGenerate();
+                            }}
+                            disabled={selectedGoal !== "Improve Endurance" && !selectedEquipment}
+                        >
+                            Generate Plan
+                        </Button>
+                    </div>
+                </Card>
+            )}
+
+            {/* REVIEW - Placeholder for future plan display */}
+            {stage === "REVIEW" && (
+                <Card className="max-w-2xl w-full p-6 space-y-6">
+                    <h2 className="text-xl font-bold text-center">
+                        Your Program
+                    </h2>
+
+                    <div className="space-y-4">
+                        <div className="p-4 bg-muted/30 rounded-lg">
+                            <h3 className="font-semibold mb-2">Profile Summary</h3>
+                            <pre className="text-xs overflow-auto">
+                                {JSON.stringify(buildUserProfile(), null, 2)}
+                            </pre>
+                        </div>
+
+                        <div className="p-4 bg-muted/30 rounded-lg">
+                            <p className="text-sm text-muted-foreground">
+                                {/* Workout generation will be handled by deterministic logic here */}
+                                Workout plan generation coming soon...
+                            </p>
+                        </div>
+
+                        <div className="p-4 bg-muted/30 rounded-lg">
+                            <p className="text-sm text-muted-foreground">
+                                {/* Meal plan generation will be handled by deterministic logic here */}
+                                Meal plan generation coming soon...
+                            </p>
+                        </div>
+                    </div>
+
+                    <Button className="w-full" onClick={() => setStage("LANDING")}>
+                        Start Over
+                    </Button>
                 </Card>
             )}
         </div>
