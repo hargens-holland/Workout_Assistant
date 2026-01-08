@@ -1,0 +1,114 @@
+/* PAGE WRAPPER */
+.motivator-wrapper {
+    height: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* THE CHARACTER */
+.motivator {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    background: #4f46e5;
+    border-radius: 30% 30% 40% 40%;
+    animation: bounce 2s infinite ease-in-out;
+}
+
+/* EYES */
+.eye {
+    position: absolute;
+    top: 28px;
+    width: 10px;
+    height: 10px;
+    background: #111;
+    border-radius: 50%;
+    animation: blink 4s infinite;
+}
+
+.eye.left {
+    left: 24px;
+}
+
+.eye.right {
+    right: 24px;
+}
+
+/* MOUTH */
+.mouth {
+    position: absolute;
+    bottom: 22px;
+    left: 50%;
+    width: 26px;
+    height: 14px;
+    border-bottom: 4px solid #111;
+    border-radius: 0 0 20px 20px;
+    transform: translateX(-50%);
+    animation: smile 2s infinite ease-in-out;
+}
+
+/* SHADOW */
+.shadow {
+    width: 70px;
+    height: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    margin-top: 12px;
+    animation: shadow 2s infinite ease-in-out;
+}
+
+/* ANIMATIONS */
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0) scale(1, 1);
+    }
+
+    50% {
+        transform: translateY(-24px) scale(1.05, 0.95);
+    }
+}
+
+@keyframes shadow {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.25;
+    }
+
+    50% {
+        transform: scale(0.7);
+        opacity: 0.15;
+    }
+}
+
+@keyframes blink {
+
+    0%,
+    92%,
+    100% {
+        transform: scaleY(1);
+    }
+
+    94%,
+    96% {
+        transform: scaleY(0.1);
+    }
+}
+
+@keyframes smile {
+
+    0%,
+    100% {
+        width: 26px;
+    }
+
+    50% {
+        width: 34px;
+    }
+}

@@ -156,18 +156,6 @@ export default function GenerateProgramPage() {
                         Customize Your Body
                     </h2>
 
-                    {/* Character */}
-                    <div className="flex justify-center">
-                        <div
-                            className="bg-primary/20 rounded-full transition-all"
-                            style={{
-                                height: `${height}px`,
-                                width: `${weight}px`,
-                                transform: `scale(${1 + (age - 25) * 0.01})`
-                            }}
-                        />
-                    </div>
-
                     {/* Sliders */}
                     <div className="space-y-4">
                         <label className="block">
