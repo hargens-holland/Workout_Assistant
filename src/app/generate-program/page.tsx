@@ -2,83 +2,64 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 /* =======================
    Types
 ======================= */
 
-type Stage = "LANDING" | "PROFILE" | "GOAL" | "GOAL_DETAILS" | "CONSTRAINTS" | "REVIEW";
+type ConversationNode =
+    | "INTRO"
+    | "AGE"
+    | "HEIGHT"
+    | "WEIGHT"
+    | "FITNESS_GOAL"
+    | "EXPERIENCE_LEVEL"
+    | "WORKOUT_FREQUENCY"
+    | "INJURIES"
+    | "DIETARY_PREFERENCES"
+    | "CONFIRMATION"
+    | "GENERATING"
+    | "COMPLETE";
 
-type FitnessGoal = "Lose Fat" | "Gain Muscle" | "Increase Strength" | "Improve Endurance";
-type Equipment = "Bodyweight Only" | "Dumbbells" | "Full Gym";
-
-// Goal-specific details
-type GoalDetails = {
-    // Lose Fat
-    targetWeight?: number;
-    timeframeWeeks?: number;
-
-    // Gain Muscle
-    targetMuscleGain?: number; // in pounds
-    timeframeMonths?: number;
-
-    // Increase Strength
-    targetLift?: string; // e.g., "Bench Press"
-    targetIncrease?: number; // in pounds
-
-    // Improve Endurance
-    cardioExercise?: string; // e.g., "5K Run", "10K Run"
-    targetTime?: string; // e.g., "25:00", "45:00"
+type Message = {
+    role: "assistant" | "user";
+    content: string;
+    timestamp: Date;
 };
 
-export type UserProfile = {
-    // Body stats
-    age: number;
-    height: number;
-    weight: number;
-
-    // Goal and constraints
-    goal: FitnessGoal;
-    goalDetails?: GoalDetails;
-    equipment?: Equipment; // Optional for Improve Endurance
-    daysPerWeek: number;
-    minutesPerSession: number;
-
-    // Optional
-    experience?: string;
-    dietaryRestrictions?: string;
+type CollectedData = {
+    full_name?: string;
+    age?: number;
+    height?: string;
+    weight?: string;
+    fitness_goal?: string;
+    fitness_level?: string;
+    workout_days?: number;
+    injuries?: string;
+    dietary_restrictions?: string;
 };
 
 /* =======================
-   Template Types (for future implementation)
+   Conversation Messages
 ======================= */
 
-export type WorkoutPlanTemplate = {
-    schedule: string[];
-    exercises: Array<{
-        day: string;
-        routine: Array<{
-            name: string;
-            sets: number;
-            reps: number;
-            duration?: number;
-            description?: string;
-        }>;
-    }>;
-};
-
-export type MealPlanTemplate = {
-    dailyCalories: number;
-    meals: Array<{
-        name: string;
-        foods: string[];
-        calories: number;
-        instructions: string[];
-    }>;
+const CONVERSATION_MESSAGES: Record<ConversationNode, string> = {
+    INTRO: "Hello {{full_name}}! I'm going to help you build a personalized workout and nutrition plan.\n\nI'll ask a few quick questions to tailor everything to you.\n\nLet's get started.",
+    AGE: "How old are you?",
+    HEIGHT: "What is your height? You can say it in feet and inches or centimeters.",
+    WEIGHT: "What is your current weight?",
+    FITNESS_GOAL: "What is your main fitness goal?\nYou can say things like fat loss, muscle gain, strength, or general fitness.",
+    EXPERIENCE_LEVEL: "How would you describe your training experience?\nBeginner, intermediate, or advanced?",
+    WORKOUT_FREQUENCY: "How many days per week can you realistically work out?",
+    INJURIES: "Do you have any injuries, pain, or movement limitations I should be aware of?",
+    DIETARY_PREFERENCES: "Do you have any dietary restrictions or preferences?\nFor example vegetarian, vegan, allergies, or none.",
+    CONFIRMATION: "Perfect. I've got everything I need.\n\nI'm going to build your personalized plan now.",
+    GENERATING: "Generating your personalized workout and meal plan...",
+    COMPLETE: "Your plan has been generated! Check it out below.",
 };
 
 /* =======================
@@ -90,542 +71,439 @@ export default function GenerateProgramPage() {
 
     // Get user from database
     const dbUser = useQuery(
-        api.users.getUserByClerkID,
-        user?.id ? { clerkID: user.id } : "skip"
+        api.users.getUserByClerkId,
+        user?.id ? { clerkId: user.id } : "skip"
     );
 
     // Get all saved plans for the user
     const savedPlans = useQuery(
         api.plans.getUserPlans,
-        dbUser?._id ? { userID: dbUser._id } : "skip"
+        dbUser?._id ? { userId: dbUser._id } : "skip"
     );
 
-    const [stage, setStage] = useState<Stage>("LANDING");
+    const [currentNode, setCurrentNode] = useState<ConversationNode>("INTRO");
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [userInput, setUserInput] = useState("");
+    const [collectedData, setCollectedData] = useState<CollectedData>({});
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [generatedPlan, setGeneratedPlan] = useState<any>(null);
 
-    // Profile state
-    const [age, setAge] = useState(25);
-    const [height, setHeight] = useState(170);
-    const [weight, setWeight] = useState(70);
+    const generatePlanAction = useAction(api.plans.generatePlan);
 
-    // Goal and constraints
-    const [selectedGoal, setSelectedGoal] = useState<FitnessGoal | null>(null);
-    const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
-    const [daysPerWeek, setDaysPerWeek] = useState(4);
-    const [minutesPerSession, setMinutesPerSession] = useState(45);
+    const messageContainerRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
-    // Goal-specific details
-    const [goalDetails, setGoalDetails] = useState<GoalDetails>({});
+    // Auto-scroll messages
+    useEffect(() => {
+        if (messageContainerRef.current) {
+            messageContainerRef.current.scrollTop = messageContainerRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    // Focus input when new question appears
+    useEffect(() => {
+        if (currentNode !== "INTRO" && currentNode !== "CONFIRMATION" && currentNode !== "GENERATING" && currentNode !== "COMPLETE") {
+            setTimeout(() => inputRef.current?.focus(), 100);
+        }
+    }, [currentNode]);
+
+    // Initialize conversation
+    useEffect(() => {
+        if (currentNode === "INTRO" && user && messages.length === 0) {
+            const fullName = user.firstName
+                ? `${user.firstName} ${user.lastName || ""}`.trim()
+                : "There";
+
+            setCollectedData({ full_name: fullName });
+
+            const introMessage = CONVERSATION_MESSAGES.INTRO.replace("{{full_name}}", fullName);
+            setMessages([{
+                role: "assistant",
+                content: introMessage,
+                timestamp: new Date(),
+            }]);
+        }
+    }, [user, currentNode, messages.length]);
 
     /* =======================
-       Build User Profile
+       Handle User Input
     ======================= */
 
-    const buildUserProfile = (): UserProfile | null => {
-        if (!selectedGoal) {
-            return null;
-        }
-
-        // Improve Endurance doesn't need equipment
-        if (selectedGoal !== "Improve Endurance" && !selectedEquipment) {
-            return null;
-        }
-
-        return {
-            age,
-            height,
-            weight,
-            goal: selectedGoal,
-            goalDetails: Object.keys(goalDetails).length > 0 ? goalDetails : undefined,
-            equipment: selectedEquipment || undefined,
-            daysPerWeek,
-            minutesPerSession,
-        };
+    const normalizeFitnessGoal = (input: string): string => {
+        const lower = input.toLowerCase();
+        if (lower.includes("lose") || lower.includes("fat") || lower.includes("weight")) return "fat_loss";
+        if (lower.includes("muscle") || lower.includes("gain") || lower.includes("bulk")) return "muscle_gain";
+        if (lower.includes("strength") || lower.includes("strong") || lower.includes("power")) return "strength";
+        if (lower.includes("endurance") || lower.includes("cardio") || lower.includes("run")) return "endurance";
+        return "general_fitness";
     };
 
-    const handleGenerate = () => {
-        const profile = buildUserProfile();
-        if (!profile) return;
+    const extractNumber = (input: string): number | null => {
+        const match = input.match(/\d+/);
+        return match ? parseInt(match[0]) : null;
+    };
 
-        // TODO: Workout generation will be handled by deterministic logic here
-        // const workoutPlan = generateWorkoutPlan(profile);
+    const handleSubmit = () => {
+        if (!userInput.trim()) return;
 
-        // TODO: Meal plan generation will be handled by deterministic logic here
-        // const mealPlan = generateMealPlan(profile);
+        // Add user message
+        const userMessage: Message = {
+            role: "user",
+            content: userInput.trim(),
+            timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, userMessage]);
 
-        console.log("User Profile:", profile);
-        // For now, just log the profile - implementation will come later
+        // Process based on current node
+        let nextNode: ConversationNode;
+        const newData = { ...collectedData };
+
+        switch (currentNode) {
+            case "AGE":
+                const age = extractNumber(userInput);
+                if (age) {
+                    newData.age = age;
+                    nextNode = "HEIGHT";
+                } else {
+                    // Ask again if invalid
+                    setMessages(prev => [...prev, {
+                        role: "assistant",
+                        content: "Please enter a valid age (e.g., 25).",
+                        timestamp: new Date(),
+                    }]);
+                    setUserInput("");
+                    return;
+                }
+                break;
+
+            case "HEIGHT":
+                newData.height = userInput.trim();
+                nextNode = "WEIGHT";
+                break;
+
+            case "WEIGHT":
+                newData.weight = userInput.trim();
+                nextNode = "FITNESS_GOAL";
+                break;
+
+            case "FITNESS_GOAL":
+                newData.fitness_goal = normalizeFitnessGoal(userInput);
+                nextNode = "EXPERIENCE_LEVEL";
+                break;
+
+            case "EXPERIENCE_LEVEL":
+                newData.fitness_level = userInput.trim().toLowerCase();
+                nextNode = "WORKOUT_FREQUENCY";
+                break;
+
+            case "WORKOUT_FREQUENCY":
+                const days = extractNumber(userInput);
+                if (days && days >= 1 && days <= 7) {
+                    newData.workout_days = days;
+                    nextNode = "INJURIES";
+                } else {
+                    setMessages(prev => [...prev, {
+                        role: "assistant",
+                        content: "Please enter a number between 1 and 7.",
+                        timestamp: new Date(),
+                    }]);
+                    setUserInput("");
+                    return;
+                }
+                break;
+
+            case "INJURIES":
+                newData.injuries = userInput.trim() || "None";
+                nextNode = "DIETARY_PREFERENCES";
+                break;
+
+            case "DIETARY_PREFERENCES":
+                newData.dietary_restrictions = userInput.trim() || "None";
+                nextNode = "CONFIRMATION";
+                break;
+
+            default:
+                return;
+        }
+
+        setCollectedData(newData);
+        setUserInput("");
+
+        // Add assistant response for next question
+        if (nextNode !== "CONFIRMATION") {
+            setTimeout(() => {
+                setMessages(prev => [...prev, {
+                    role: "assistant",
+                    content: CONVERSATION_MESSAGES[nextNode],
+                    timestamp: new Date(),
+                }]);
+                setCurrentNode(nextNode);
+            }, 300);
+        } else {
+            // Show confirmation and generate plan
+            setTimeout(() => {
+                setMessages(prev => [...prev, {
+                    role: "assistant",
+                    content: CONVERSATION_MESSAGES.CONFIRMATION,
+                    timestamp: new Date(),
+                }]);
+                setCurrentNode("GENERATING");
+                generatePlan(newData);
+            }, 300);
+        }
+    };
+
+    /* =======================
+       Generate Plan with Gemini
+    ======================= */
+
+    const generatePlan = async (data: CollectedData) => {
+        if (!dbUser?._id) {
+            setError("User not found. Please make sure you're logged in.");
+            return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            // Call Convex action to generate plan
+            const result = await generatePlanAction({
+                userId: dbUser._id,
+                age: data.age!,
+                height: data.height!,
+                weight: data.weight!,
+                injuries: data.injuries || "None",
+                workout_days: data.workout_days!,
+                fitness_goal: data.fitness_goal!,
+                fitness_level: data.fitness_level!,
+                dietary_restrictions: data.dietary_restrictions || "None",
+            });
+
+            if (result.success) {
+                setGeneratedPlan(result.data);
+                setCurrentNode("COMPLETE");
+                setMessages(prev => [...prev, {
+                    role: "assistant",
+                    content: CONVERSATION_MESSAGES.COMPLETE,
+                    timestamp: new Date(),
+                }]);
+            } else {
+                throw new Error("Failed to generate plan");
+            }
+        } catch (err) {
+            console.error("Error generating plan:", err);
+            setError(err instanceof Error ? err.message : "Failed to generate plan");
+            setMessages(prev => [...prev, {
+                role: "assistant",
+                content: `Sorry, there was an error generating your plan: ${err instanceof Error ? err.message : "Unknown error"}`,
+                timestamp: new Date(),
+            }]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /* =======================
+       Start Conversation
+    ======================= */
+
+    const startConversation = () => {
+        setCurrentNode("AGE");
+        setMessages(prev => [...prev, {
+            role: "assistant",
+            content: CONVERSATION_MESSAGES.AGE,
+            timestamp: new Date(),
+        }]);
     };
 
     /* =======================
        RENDER
     ======================= */
 
+    const showInput = currentNode !== "INTRO" &&
+        currentNode !== "CONFIRMATION" &&
+        currentNode !== "GENERATING" &&
+        currentNode !== "COMPLETE";
+
     return (
         <div className="min-h-screen flex items-center justify-center px-4 py-8">
-            {/* LANDING */}
-            {stage === "LANDING" && (
-                <div className="max-w-4xl w-full space-y-6">
-                    <Card className="p-8 text-center space-y-4">
-                        <h1 className="text-3xl font-bold">Your Fitness Coach</h1>
-                        <p className="text-muted-foreground">
-                            Personalized workouts and meal plans built exactly for your body,
-                            goals, and schedule.
-                        </p>
-                        <Button size="lg" onClick={() => setStage("PROFILE")}>
-                            Create My Program
-                        </Button>
-                    </Card>
+            <div className="max-w-4xl w-full space-y-6">
+                {/* Chat Interface */}
+                <Card className="p-6">
+                    <h2 className="text-xl font-bold mb-4 text-center">
+                        Your Fitness Coach
+                    </h2>
 
-                    {/* Display Saved Plans */}
-                    {user && dbUser && savedPlans && savedPlans.length > 0 && (
-                        <Card className="p-6">
-                            <h2 className="text-xl font-bold mb-4">📋 Your Saved Plans</h2>
-                            <div className="space-y-4">
-                                {savedPlans.map((plan: any) => (
-                                    <div
-                                        key={plan._id}
-                                        className="border rounded-lg p-4 bg-muted/30 space-y-2"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h3 className="font-semibold">{plan.name}</h3>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Created: {new Date(plan._creationTime).toLocaleDateString()}
-                                                    {plan.isActive && (
-                                                        <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">
-                                                            Active
-                                                        </span>
-                                                    )}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                                <span className="font-semibold">Workout Days: </span>
-                                                {plan.workoutPlan.schedule.join(", ")}
-                                            </div>
-                                            <div>
-                                                <span className="font-semibold">Daily Calories: </span>
-                                                {plan.dietPlan.dailyCalories}
-                                            </div>
-                                        </div>
+                    {/* Messages */}
+                    <div
+                        ref={messageContainerRef}
+                        className="h-96 overflow-y-auto border rounded-lg p-4 space-y-4 mb-4 bg-muted/30"
+                    >
+                        {messages.length === 0 && currentNode === "INTRO" && (
+                            <div className="text-center text-muted-foreground py-8">
+                                <p>Click "Start Conversation" to begin</p>
+                            </div>
+                        )}
+
+                        {messages.map((msg, idx) => (
+                            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-[80%] rounded-lg p-3 ${msg.role === "user"
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted"
+                                    }`}>
+                                    <div className="text-xs font-semibold mb-1 opacity-70">
+                                        {msg.role === "user" ? "You" : "Coach"}
                                     </div>
-                                ))}
+                                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                                </div>
                             </div>
-                        </Card>
-                    )}
-                </div>
-            )}
-
-            {/* PROFILE - Body Stats */}
-            {stage === "PROFILE" && (
-                <Card className="max-w-xl w-full p-6 space-y-6">
-                    <h2 className="text-xl font-bold text-center">
-                        Your Body Stats
-                    </h2>
-
-                    <div className="space-y-4">
-                        <label className="block">
-                            <span className="text-sm font-medium mb-2 block">Age: {age}</span>
-                            <input
-                                type="range"
-                                min={16}
-                                max={80}
-                                value={age}
-                                onChange={(e) => setAge(Number(e.target.value))}
-                                className="w-full"
-                            />
-                        </label>
-
-                        <label className="block">
-                            <span className="text-sm font-medium mb-2 block">Height: {height} cm</span>
-                            <input
-                                type="range"
-                                min={140}
-                                max={210}
-                                value={height}
-                                onChange={(e) => setHeight(Number(e.target.value))}
-                                className="w-full"
-                            />
-                        </label>
-
-                        <label className="block">
-                            <span className="text-sm font-medium mb-2 block">Weight: {weight} kg</span>
-                            <input
-                                type="range"
-                                min={45}
-                                max={140}
-                                value={weight}
-                                onChange={(e) => setWeight(Number(e.target.value))}
-                                className="w-full"
-                            />
-                        </label>
-                    </div>
-
-                    <div className="flex gap-3">
-                        <Button variant="outline" className="flex-1" onClick={() => setStage("LANDING")}>
-                            Back
-                        </Button>
-                        <Button className="flex-1" onClick={() => setStage("GOAL")}>
-                            Continue
-                        </Button>
-                    </div>
-                </Card>
-            )}
-
-            {/* GOAL SELECTION */}
-            {stage === "GOAL" && (
-                <Card className="max-w-2xl w-full p-6 space-y-6">
-                    <h2 className="text-xl font-bold text-center">
-                        What's Your Primary Goal?
-                    </h2>
-                    <p className="text-center text-muted-foreground text-sm">
-                        Select one goal to focus on
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        {(["Lose Fat", "Gain Muscle", "Increase Strength", "Improve Endurance"] as FitnessGoal[]).map((goal) => (
-                            <button
-                                key={goal}
-                                onClick={() => setSelectedGoal(goal)}
-                                className={`p-6 rounded-lg border-2 transition-all text-left ${selectedGoal === goal
-                                    ? "border-primary bg-primary/10"
-                                    : "border-border hover:border-primary/50"
-                                    }`}
-                            >
-                                <h3 className="font-semibold text-lg mb-2">{goal}</h3>
-                                <p className="text-sm text-muted-foreground">
-                                    {goal === "Lose Fat" && "Burn calories and reduce body fat"}
-                                    {goal === "Gain Muscle" && "Build muscle mass and size"}
-                                    {goal === "Increase Strength" && "Get stronger with progressive overload"}
-                                    {goal === "Improve Endurance" && "Build cardiovascular fitness"}
-                                </p>
-                            </button>
                         ))}
-                    </div>
 
-                    <div className="flex gap-3">
-                        <Button variant="outline" className="flex-1" onClick={() => setStage("PROFILE")}>
-                            Back
-                        </Button>
-                        <Button
-                            className="flex-1"
-                            onClick={() => setStage("GOAL_DETAILS")}
-                            disabled={!selectedGoal}
-                        >
-                            Continue
-                        </Button>
-                    </div>
-                </Card>
-            )}
-
-            {/* GOAL DETAILS - Follow-up questions based on selected goal */}
-            {stage === "GOAL_DETAILS" && selectedGoal && (
-                <Card className="max-w-xl w-full p-6 space-y-6">
-                    <h2 className="text-xl font-bold text-center">
-                        Tell Us More About Your Goal
-                    </h2>
-
-                    {/* Lose Fat */}
-                    {selectedGoal === "Lose Fat" && (
-                        <div className="space-y-6">
-                            <div>
-                                <label className="text-sm font-medium mb-2 block">
-                                    How much weight do you want to lose? (kg)
-                                </label>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    max={50}
-                                    value={goalDetails.targetWeight || ""}
-                                    onChange={(e) => setGoalDetails({ ...goalDetails, targetWeight: Number(e.target.value) })}
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    placeholder="e.g., 10"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium mb-2 block">
-                                    How long do you want to achieve this? (weeks)
-                                </label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {[8, 12, 16, 20].map((weeks) => (
-                                        <button
-                                            key={weeks}
-                                            onClick={() => setGoalDetails({ ...goalDetails, timeframeWeeks: weeks })}
-                                            className={`p-3 rounded-lg border-2 transition-all ${goalDetails.timeframeWeeks === weeks
-                                                ? "border-primary bg-primary/10"
-                                                : "border-border hover:border-primary/50"
-                                                }`}
-                                        >
-                                            {weeks} weeks
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Gain Muscle */}
-                    {selectedGoal === "Gain Muscle" && (
-                        <div className="space-y-6">
-                            <div>
-                                <label className="text-sm font-medium mb-2 block">
-                                    How much muscle do you want to gain? (pounds)
-                                </label>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    max={50}
-                                    value={goalDetails.targetMuscleGain || ""}
-                                    onChange={(e) => setGoalDetails({ ...goalDetails, targetMuscleGain: Number(e.target.value) })}
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    placeholder="e.g., 15"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium mb-2 block">
-                                    How fast do you want to gain? (months)
-                                </label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {[3, 6, 9, 12].map((months) => (
-                                        <button
-                                            key={months}
-                                            onClick={() => setGoalDetails({ ...goalDetails, timeframeMonths: months })}
-                                            className={`p-3 rounded-lg border-2 transition-all ${goalDetails.timeframeMonths === months
-                                                ? "border-primary bg-primary/10"
-                                                : "border-border hover:border-primary/50"
-                                                }`}
-                                        >
-                                            {months} months
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Increase Strength */}
-                    {selectedGoal === "Increase Strength" && (
-                        <div className="space-y-6">
-                            <div>
-                                <label className="text-sm font-medium mb-3 block">
-                                    Which lift do you want to improve?
-                                </label>
-                                <div className="grid grid-cols-1 gap-3">
-                                    {["Bench Press", "Squat", "Deadlift", "Overhead Press"].map((lift) => (
-                                        <button
-                                            key={lift}
-                                            onClick={() => setGoalDetails({ ...goalDetails, targetLift: lift })}
-                                            className={`p-4 rounded-lg border-2 transition-all text-left ${goalDetails.targetLift === lift
-                                                ? "border-primary bg-primary/10"
-                                                : "border-border hover:border-primary/50"
-                                                }`}
-                                        >
-                                            <span className="font-medium">{lift}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium mb-2 block">
-                                    How much do you want to add? (pounds)
-                                </label>
-                                <input
-                                    type="number"
-                                    min={5}
-                                    max={200}
-                                    step={5}
-                                    value={goalDetails.targetIncrease || ""}
-                                    onChange={(e) => setGoalDetails({ ...goalDetails, targetIncrease: Number(e.target.value) })}
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    placeholder="e.g., 20"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Improve Endurance */}
-                    {selectedGoal === "Improve Endurance" && (
-                        <div className="space-y-6">
-                            <div>
-                                <label className="text-sm font-medium mb-3 block">
-                                    What cardio exercise do you want to focus on?
-                                </label>
-                                <div className="grid grid-cols-1 gap-3">
-                                    {["5K Run", "10K Run", "Half Marathon", "Marathon", "Cycling", "Swimming"].map((exercise) => (
-                                        <button
-                                            key={exercise}
-                                            onClick={() => setGoalDetails({ ...goalDetails, cardioExercise: exercise })}
-                                            className={`p-4 rounded-lg border-2 transition-all text-left ${goalDetails.cardioExercise === exercise
-                                                ? "border-primary bg-primary/10"
-                                                : "border-border hover:border-primary/50"
-                                                }`}
-                                        >
-                                            <span className="font-medium">{exercise}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium mb-2 block">
-                                    What's your target time? (MM:SS)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={goalDetails.targetTime || ""}
-                                    onChange={(e) => setGoalDetails({ ...goalDetails, targetTime: e.target.value })}
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                    placeholder="e.g., 25:00 or 1:30:00"
-                                />
-                                <p className="text-xs text-muted-foreground mt-1">
-                                    Format: MM:SS for shorter distances, H:MM:SS for longer
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex gap-3">
-                        <Button variant="outline" className="flex-1" onClick={() => setStage("GOAL")}>
-                            Back
-                        </Button>
-                        <Button
-                            className="flex-1"
-                            onClick={() => setStage("CONSTRAINTS")}
-                            disabled={
-                                (selectedGoal === "Lose Fat" && (!goalDetails.targetWeight || !goalDetails.timeframeWeeks)) ||
-                                (selectedGoal === "Gain Muscle" && (!goalDetails.targetMuscleGain || !goalDetails.timeframeMonths)) ||
-                                (selectedGoal === "Increase Strength" && (!goalDetails.targetLift || !goalDetails.targetIncrease)) ||
-                                (selectedGoal === "Improve Endurance" && (!goalDetails.cardioExercise || !goalDetails.targetTime))
-                            }
-                        >
-                            Continue
-                        </Button>
-                    </div>
-                </Card>
-            )}
-
-            {/* CONSTRAINTS */}
-            {stage === "CONSTRAINTS" && (
-                <Card className="max-w-xl w-full p-6 space-y-6">
-                    <h2 className="text-xl font-bold text-center">
-                        Your Training Setup
-                    </h2>
-
-                    <div className="space-y-6">
-                        {/* Equipment Selection - Skip for Improve Endurance */}
-                        {selectedGoal !== "Improve Endurance" && (
-                            <div>
-                                <label className="text-sm font-medium mb-3 block">Available Equipment</label>
-                                <div className="grid grid-cols-1 gap-3">
-                                    {(["Bodyweight Only", "Dumbbells", "Full Gym"] as Equipment[]).map((equip) => (
-                                        <button
-                                            key={equip}
-                                            onClick={() => setSelectedEquipment(equip)}
-                                            className={`p-4 rounded-lg border-2 transition-all text-left ${selectedEquipment === equip
-                                                ? "border-primary bg-primary/10"
-                                                : "border-border hover:border-primary/50"
-                                                }`}
-                                        >
-                                            <span className="font-medium">{equip}</span>
-                                        </button>
-                                    ))}
+                        {loading && (
+                            <div className="flex justify-start">
+                                <div className="bg-muted rounded-lg p-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                                        <span className="text-sm">Generating your plan...</span>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Days Per Week */}
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">
-                                Days Per Week: {daysPerWeek}
-                            </label>
-                            <input
-                                type="range"
-                                min={2}
-                                max={7}
-                                value={daysPerWeek}
-                                onChange={(e) => setDaysPerWeek(Number(e.target.value))}
-                                className="w-full"
-                            />
-                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                <span>2</span>
-                                <span>7</span>
+                        {error && (
+                            <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded">
+                                <p className="font-semibold">Error:</p>
+                                <p>{error}</p>
                             </div>
-                        </div>
+                        )}
+                    </div>
 
-                        {/* Minutes Per Session */}
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">
-                                Minutes Per Session: {minutesPerSession}
-                            </label>
+                    {/* Input Area */}
+                    {currentNode === "INTRO" && (
+                        <Button className="w-full" onClick={startConversation}>
+                            Start Conversation
+                        </Button>
+                    )}
+
+                    {showInput && (
+                        <div className="flex gap-2">
                             <input
-                                type="range"
-                                min={20}
-                                max={120}
-                                step={5}
-                                value={minutesPerSession}
-                                onChange={(e) => setMinutesPerSession(Number(e.target.value))}
-                                className="w-full"
+                                ref={inputRef}
+                                className="flex-1 rounded-lg border px-3 py-2"
+                                value={userInput}
+                                onChange={(e) => setUserInput(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                                placeholder="Type your answer..."
+                                disabled={loading}
                             />
-                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                                <span>20 min</span>
-                                <span>120 min</span>
+                            <Button onClick={handleSubmit} disabled={loading || !userInput.trim()}>
+                                Send
+                            </Button>
+                        </div>
+                    )}
+
+                    {currentNode === "COMPLETE" && generatedPlan && (
+                        <div className="mt-4 space-y-4">
+                            <div>
+                                <h3 className="text-lg font-semibold mb-3">💪 Your Workout Plan</h3>
+                                <div className="bg-muted/30 border rounded-lg p-4">
+                                    <div className="mb-2">
+                                        <span className="font-semibold">Schedule: </span>
+                                        {generatedPlan.workoutPlan?.schedule?.join(", ")}
+                                    </div>
+                                    <div className="space-y-3 mt-4">
+                                        {generatedPlan.workoutPlan?.exercises?.map((exercise: any, idx: number) => (
+                                            <div key={idx} className="border-l-2 border-primary pl-3">
+                                                <h4 className="font-semibold">{exercise.day}</h4>
+                                                <ul className="list-disc list-inside space-y-1 mt-1 text-sm">
+                                                    {exercise.routines?.map((routine: any, rIdx: number) => (
+                                                        <li key={rIdx}>
+                                                            {routine.name} - {routine.sets} sets × {routine.reps} reps
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
 
-                    <div className="flex gap-3">
-                        <Button variant="outline" className="flex-1" onClick={() => setStage("GOAL_DETAILS")}>
-                            Back
-                        </Button>
-                        <Button
-                            className="flex-1"
-                            onClick={() => {
-                                setStage("REVIEW");
-                                handleGenerate();
-                            }}
-                            disabled={selectedGoal !== "Improve Endurance" && !selectedEquipment}
-                        >
-                            Generate Plan
-                        </Button>
-                    </div>
+                            <div>
+                                <h3 className="text-lg font-semibold mb-3">🍽️ Your Meal Plan</h3>
+                                <div className="bg-muted/30 border rounded-lg p-4">
+                                    <div className="mb-3">
+                                        <span className="font-semibold">Daily Calories: </span>
+                                        {generatedPlan.dietPlan?.dailyCalories}
+                                    </div>
+                                    <div className="space-y-2">
+                                        {generatedPlan.dietPlan?.meals?.map((meal: any, idx: number) => (
+                                            <div key={idx} className="border-l-2 border-green-500 pl-3">
+                                                <h4 className="font-semibold">{meal.name}</h4>
+                                                <ul className="list-disc list-inside space-y-1 mt-1 text-sm">
+                                                    {meal.foods?.map((food: string, fIdx: number) => (
+                                                        <li key={fIdx}>{food}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Button className="w-full" onClick={() => {
+                                setCurrentNode("INTRO");
+                                setMessages([]);
+                                setCollectedData({});
+                                setGeneratedPlan(null);
+                                setError(null);
+                            }}>
+                                Start New Conversation
+                            </Button>
+                        </div>
+                    )}
                 </Card>
-            )}
 
-            {/* REVIEW - Placeholder for future plan display */}
-            {stage === "REVIEW" && (
-                <Card className="max-w-2xl w-full p-6 space-y-6">
-                    <h2 className="text-xl font-bold text-center">
-                        Your Program
-                    </h2>
-
-                    <div className="space-y-4">
-                        <div className="p-4 bg-muted/30 rounded-lg">
-                            <h3 className="font-semibold mb-2">Profile Summary</h3>
-                            <pre className="text-xs overflow-auto">
-                                {JSON.stringify(buildUserProfile(), null, 2)}
-                            </pre>
+                {/* Display Saved Plans */}
+                {user && dbUser && savedPlans && savedPlans.length > 0 && (
+                    <Card className="p-6">
+                        <h2 className="text-xl font-bold mb-4">📋 Your Saved Plans</h2>
+                        <div className="space-y-4">
+                            {savedPlans.map((plan: any) => (
+                                <div
+                                    key={plan._id}
+                                    className="border rounded-lg p-4 bg-muted/30 space-y-2"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="font-semibold">{plan.name}</h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Created: {new Date(plan._creationTime).toLocaleDateString()}
+                                                {plan.isActive && (
+                                                    <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">
+                                                        Active
+                                                    </span>
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span className="font-semibold">Workout Days: </span>
+                                            {plan.workoutPlan.schedule.join(", ")}
+                                        </div>
+                                        <div>
+                                            <span className="font-semibold">Daily Calories: </span>
+                                            {plan.dietPlan.dailyCalories}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-
-                        <div className="p-4 bg-muted/30 rounded-lg">
-                            <p className="text-sm text-muted-foreground">
-                                {/* Workout generation will be handled by deterministic logic here */}
-                                Workout plan generation coming soon...
-                            </p>
-                        </div>
-
-                        <div className="p-4 bg-muted/30 rounded-lg">
-                            <p className="text-sm text-muted-foreground">
-                                {/* Meal plan generation will be handled by deterministic logic here */}
-                                Meal plan generation coming soon...
-                            </p>
-                        </div>
-                    </div>
-
-                    <Button className="w-full" onClick={() => setStage("LANDING")}>
-                        Start Over
-                    </Button>
-                </Card>
-            )}
+                    </Card>
+                )}
+            </div>
         </div>
     );
 }
