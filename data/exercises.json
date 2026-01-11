@@ -1,0 +1,212 @@
+[
+  {
+    "name": "Bench Press",
+    "bodyPart": "chest",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Incline Bench Press",
+    "bodyPart": "chest",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Dumbbell Press",
+    "bodyPart": "chest",
+    "isCompound": true,
+    "equipment": "dumbbell"
+  },
+  {
+    "name": "Push-ups",
+    "bodyPart": "chest",
+    "isCompound": true,
+    "equipment": "bodyweight"
+  },
+  {
+    "name": "Chest Fly",
+    "bodyPart": "chest",
+    "isCompound": false,
+    "equipment": "dumbbell"
+  },
+  {
+    "name": "Pull-ups",
+    "bodyPart": "back",
+    "isCompound": true,
+    "equipment": "bodyweight"
+  },
+  {
+    "name": "Bent-Over Row",
+    "bodyPart": "back",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Lat Pulldown",
+    "bodyPart": "back",
+    "isCompound": true,
+    "equipment": "cable"
+  },
+  {
+    "name": "T-Bar Row",
+    "bodyPart": "back",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Seated Cable Row",
+    "bodyPart": "back",
+    "isCompound": true,
+    "equipment": "cable"
+  },
+  {
+    "name": "Deadlift",
+    "bodyPart": "back",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Barbell Row",
+    "bodyPart": "back",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Squat",
+    "bodyPart": "legs",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Leg Press",
+    "bodyPart": "legs",
+    "isCompound": true,
+    "equipment": "machine"
+  },
+  {
+    "name": "Romanian Deadlift",
+    "bodyPart": "legs",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Lunges",
+    "bodyPart": "legs",
+    "isCompound": true,
+    "equipment": "bodyweight"
+  },
+  {
+    "name": "Leg Curl",
+    "bodyPart": "legs",
+    "isCompound": false,
+    "equipment": "machine"
+  },
+  {
+    "name": "Leg Extension",
+    "bodyPart": "legs",
+    "isCompound": false,
+    "equipment": "machine"
+  },
+  {
+    "name": "Calf Raise",
+    "bodyPart": "legs",
+    "isCompound": false,
+    "equipment": "machine"
+  },
+  {
+    "name": "Overhead Press",
+    "bodyPart": "shoulders",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Dumbbell Shoulder Press",
+    "bodyPart": "shoulders",
+    "isCompound": true,
+    "equipment": "dumbbell"
+  },
+  {
+    "name": "Lateral Raise",
+    "bodyPart": "shoulders",
+    "isCompound": false,
+    "equipment": "dumbbell"
+  },
+  {
+    "name": "Front Raise",
+    "bodyPart": "shoulders",
+    "isCompound": false,
+    "equipment": "dumbbell"
+  },
+  {
+    "name": "Rear Delt Fly",
+    "bodyPart": "shoulders",
+    "isCompound": false,
+    "equipment": "dumbbell"
+  },
+  {
+    "name": "Barbell Curl",
+    "bodyPart": "arms",
+    "isCompound": false,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Dumbbell Curl",
+    "bodyPart": "arms",
+    "isCompound": false,
+    "equipment": "dumbbell"
+  },
+  {
+    "name": "Hammer Curl",
+    "bodyPart": "arms",
+    "isCompound": false,
+    "equipment": "dumbbell"
+  },
+  {
+    "name": "Tricep Dip",
+    "bodyPart": "arms",
+    "isCompound": true,
+    "equipment": "bodyweight"
+  },
+  {
+    "name": "Tricep Extension",
+    "bodyPart": "arms",
+    "isCompound": false,
+    "equipment": "cable"
+  },
+  {
+    "name": "Close-Grip Bench Press",
+    "bodyPart": "arms",
+    "isCompound": true,
+    "equipment": "barbell"
+  },
+  {
+    "name": "Plank",
+    "bodyPart": "core",
+    "isCompound": true,
+    "equipment": "bodyweight"
+  },
+  {
+    "name": "Crunches",
+    "bodyPart": "core",
+    "isCompound": false,
+    "equipment": "bodyweight"
+  },
+  {
+    "name": "Russian Twist",
+    "bodyPart": "core",
+    "isCompound": false,
+    "equipment": "bodyweight"
+  },
+  {
+    "name": "Leg Raises",
+    "bodyPart": "core",
+    "isCompound": false,
+    "equipment": "bodyweight"
+  },
+  {
+    "name": "Hanging Leg Raise",
+    "bodyPart": "core",
+    "isCompound": true,
+    "equipment": "bodyweight"
+  }
+]

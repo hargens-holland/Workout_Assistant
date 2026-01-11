@@ -1,7 +1,7 @@
 "use client";
 
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
-import { DumbbellIcon, HomeIcon, UserIcon, ZapIcon } from "lucide-react";
+import { DumbbellIcon, HomeIcon, UserIcon, ZapIcon, CalendarIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "./ui/button";
 
@@ -47,6 +47,14 @@ const Navbar = () => {
                             >
                                 <UserIcon size={16} />
                                 <span>Profile</span>
+                            </Link>
+
+                            <Link
+                                href="/calendar"
+                                className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors"
+                            >
+                                <CalendarIcon size={16} />
+                                <span>Calendar</span>
                             </Link>
                             <Button
                                 asChild

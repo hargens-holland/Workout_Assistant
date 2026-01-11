@@ -10,6 +10,7 @@
 
 import type * as http from "../http.js";
 import type * as plans from "../plans.js";
+import type * as splits from "../splits.js";
 import type * as users from "../users.js";
 
 import type {
@@ -21,6 +22,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   http: typeof http;
   plans: typeof plans;
+  splits: typeof splits;
   users: typeof users;
 }>;
 

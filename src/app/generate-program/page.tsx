@@ -19,6 +19,7 @@ type ConversationNode =
     | "FITNESS_GOAL"
     | "EXPERIENCE_LEVEL"
     | "WORKOUT_FREQUENCY"
+    | "WORKOUT_SPLIT"
     | "INJURIES"
     | "DIETARY_PREFERENCES"
     | "CONFIRMATION"
@@ -39,6 +40,7 @@ type CollectedData = {
     fitness_goal?: string;
     fitness_level?: string;
     workout_days?: number;
+    split_type?: "PPL" | "UPPER_LOWER" | "FULL_BODY";
     injuries?: string;
     dietary_restrictions?: string;
 };
@@ -201,6 +203,8 @@ export default function GenerateProgramPage() {
                 const days = extractNumber(userInput);
                 if (days && days >= 1 && days <= 7) {
                     newData.workout_days = days;
+                    // Auto-select split based on workout days (no user input needed)
+                    // Split will be auto-selected in backend based on workout_days
                     nextNode = "INJURIES";
                 } else {
                     setMessages(prev => [...prev, {
@@ -279,6 +283,7 @@ export default function GenerateProgramPage() {
                 fitness_goal: data.fitness_goal!,
                 fitness_level: data.fitness_level!,
                 dietary_restrictions: data.dietary_restrictions || "None",
+                // split_type is now auto-selected based on workout_days
             });
 
             if (result.success) {
