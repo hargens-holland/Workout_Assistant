@@ -38,6 +38,10 @@ const ProfilePage = () => {
     const currentPlan = selectedPlanId
         ? allPlans?.find((plan) => plan._id === selectedPlanId)
         : activePlan;
+    
+    // Extract user rules from active plan (if available)
+    // Note: In a real app, these would be stored in user profile
+    // For now, we'll show plan-based info
 
     const addMeal = useMutation(api.plans.addMealToPlan);
     const changePlanSplit = useAction(api.plans.changePlanSplit);
@@ -114,10 +118,47 @@ const ProfilePage = () => {
         <section className="relative z-10 pt-12 pb-32 flex-grow container mx-auto px-4">
             <ProfileHeader user={user} />
 
-            {allPlans && allPlans?.length > 0 ? (
-                <div className="space-y-8">
-                    {/* PLAN SELECTOR */}
-                    <div className="relative backdrop-blur-sm border border-border p-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+                {/* Rules Section */}
+                {activePlan && (
+                    <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
+                        <CornerElements />
+                        <h2 className="text-xl font-bold mb-4">
+                            <span className="text-primary">Rules</span> & Preferences
+                        </h2>
+                        <div className="space-y-4">
+                            <div>
+                                <div className="text-sm text-muted-foreground mb-1">Fitness Goal</div>
+                                <div className="font-semibold">
+                                    {activePlan?.trainingStrategy?.goal_type || "Not set"}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-sm text-muted-foreground mb-1">Primary Focus</div>
+                                <div className="font-semibold">
+                                    {activePlan?.trainingStrategy?.primary_focus || "Not set"}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-sm text-muted-foreground mb-1">Injuries / Limitations</div>
+                                <div className="font-semibold">
+                                    {activePlan?.trainingStrategy?.recovery_notes || "None specified"}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-sm text-muted-foreground mb-1">Dietary Preferences</div>
+                                <div className="font-semibold">
+                                    {activePlan?.dietPlan?.meals?.length ? "Custom meal plan active" : "Not set"}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {allPlans && allPlans?.length > 0 ? (
+                    <div className="space-y-8">
+                        {/* PLAN SELECTOR */}
+                        <div className="relative backdrop-blur-sm border border-border p-6">
                         <CornerElements />
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-bold tracking-tight">
@@ -148,11 +189,11 @@ const ProfilePage = () => {
                                 </Button>
                             ))}
                         </div>
-                    </div>
+                        </div>
 
-                    {/* PLAN DETAILS */}
+                        {/* PLAN DETAILS */}
 
-                    {currentPlan && (
+                        {currentPlan && (
                         <div className="relative backdrop-blur-sm border border-border rounded-lg p-6">
                             <CornerElements />
 
@@ -263,7 +304,7 @@ const ProfilePage = () => {
                                         </div>
 
                                         <Accordion type="multiple" className="space-y-4">
-                                            {currentPlan.workoutPlan.exercises.map((exerciseDay, index) => (
+                                            {currentPlan?.workoutPlan?.exercises?.map((exerciseDay, index) => (
                                                 <AccordionItem
                                                     key={index}
                                                     value={exerciseDay.day}
@@ -381,7 +422,7 @@ const ProfilePage = () => {
                                         )}
 
                                         <div className="space-y-4">
-                                            {currentPlan.dietPlan.meals.map((meal, index) => (
+                                            {currentPlan?.dietPlan?.meals?.map((meal, index) => (
                                                 <div
                                                     key={index}
                                                     className="border border-border rounded-lg overflow-hidden p-4"
@@ -413,11 +454,12 @@ const ProfilePage = () => {
                                 </TabsContent>
                             </Tabs>
                         </div>
-                    )}
-                </div>
-            ) : (
-                <NoFitnessPlan />
-            )}
+                        )}
+                    </div>
+                ) : (
+                    <NoFitnessPlan />
+                )}
+            </div>
         </section>
     );
 };

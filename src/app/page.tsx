@@ -1,3 +1,8 @@
+"use client";
+
+import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import TerminalOverlay from "@/components/TerminalOverlay";
 import { Button } from "@/components/ui/button";
 import UserPrograms from "@/components/UserPrograms";
@@ -5,6 +10,14 @@ import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 
 const HomePage = () => {
+    const { isSignedIn } = useUser();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (isSignedIn) {
+            router.push("/home");
+        }
+    }, [isSignedIn, router]);
   return (
     <div className="flex flex-col min-h-screen text-foreground overflow-hidden">
       <section className="relative z-10 py-24 flex-grow">

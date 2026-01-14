@@ -2467,14 +2467,14 @@ export const regenerateExercise = action({
             sessionId: args.sessionId,
         });
 
-        const setsToReplace = allSetsForExercise.filter(s => s.exerciseId === oldExerciseId);
+        const setsToReplace = allSetsForExercise.filter((s: any) => s.exerciseId === oldExerciseId);
 
         if (setsToReplace.length === 0) {
             throw new Error("No sets found for this exercise");
         }
 
         // Check if any sets being replaced are completed
-        const hasCompletedSets = setsToReplace.some(s => s.completed);
+        const hasCompletedSets = setsToReplace.some((s: any) => s.completed);
         if (hasCompletedSets) {
             throw new Error("Cannot regenerate exercise with completed sets");
         }
@@ -2643,7 +2643,7 @@ export const regenerateMeal = action({
             const weekMeals = await ctx.runQuery(api.plans.getDailyMealsBySession, {
                 sessionId: ws._id,
             });
-            weekMeals.forEach((dm) => {
+            weekMeals.forEach((dm: any) => {
                 if (dm._id !== args.dailyMealId) {
                     mealsUsedThisWeek.add(dm.mealId);
                 }

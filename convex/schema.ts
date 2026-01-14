@@ -132,4 +132,16 @@ export default defineSchema({
     })
         .index("by_user_id", ["userId"])
         .index("by_item", ["itemType", "itemId"]),
+
+    meal_logs: defineTable({
+        userId: v.id("users"),
+        date: v.string(), // ISO date string (YYYY-MM-DD)
+        name: v.string(),
+        calories: v.number(),
+        protein: v.optional(v.number()), // grams
+        mealType: v.optional(v.string()), // "breakfast", "lunch", "dinner", "snack"
+    })
+        .index("by_user_id", ["userId"])
+        .index("by_date", ["date"])
+        .index("by_user_and_date", ["userId", "date"]),
 });

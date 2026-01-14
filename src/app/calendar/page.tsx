@@ -4,7 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState, useMemo } from "react";
-import { CalendarIcon, DumbbellIcon, AppleIcon, Trash2Icon, CheckIcon, RefreshCwIcon, BanIcon } from "lucide-react";
+import { CalendarIcon, DumbbellIcon, AppleIcon, Trash2Icon, CheckIcon, RefreshCwIcon, BanIcon, MoveIcon } from "lucide-react";
 import CornerElements from "@/components/CornerElements";
 import { Button } from "@/components/ui/button";
 
@@ -335,19 +335,56 @@ const CalendarPage = () => {
 
                         {selectedWorkout && (
                             <div className="mt-6 border border-border rounded-lg p-6 bg-background/50">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <CalendarIcon className="h-5 w-5 text-primary" />
-                                    <h3 className="text-lg font-bold">
-                                        {new Date(selectedWorkout.date).toLocaleDateString(
-                                            "en-US",
-                                            {
-                                                weekday: "long",
-                                                year: "numeric",
-                                                month: "long",
-                                                day: "numeric",
-                                            }
-                                        )}
-                                    </h3>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <CalendarIcon className="h-5 w-5 text-primary" />
+                                        <h3 className="text-lg font-bold">
+                                            {new Date(selectedWorkout.date).toLocaleDateString(
+                                                "en-US",
+                                                {
+                                                    weekday: "long",
+                                                    year: "numeric",
+                                                    month: "long",
+                                                    day: "numeric",
+                                                }
+                                            )}
+                                        </h3>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="date"
+                                            value={rescheduleDate}
+                                            onChange={(e) => setRescheduleDate(e.target.value)}
+                                            className="px-3 py-1 border border-border rounded bg-background text-sm"
+                                        />
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={async () => {
+                                                if (!rescheduleDate) {
+                                                    alert("Please select a date");
+                                                    return;
+                                                }
+                                                if (!confirm(`Move this workout to ${new Date(rescheduleDate).toLocaleDateString()}?`)) {
+                                                    return;
+                                                }
+                                                try {
+                                                    await moveWorkoutSession({
+                                                        sessionId: selectedWorkout._id,
+                                                        newDate: rescheduleDate,
+                                                    });
+                                                    setRescheduleDate("");
+                                                    alert("Workout moved successfully");
+                                                } catch (error) {
+                                                    alert(`Failed to move workout: ${error instanceof Error ? error.message : String(error)}`);
+                                                }
+                                            }}
+                                            disabled={!rescheduleDate}
+                                        >
+                                            <MoveIcon className="h-4 w-4 mr-1" />
+                                            Move
+                                        </Button>
+                                    </div>
                                 </div>
 
                                 <div className="mb-4">

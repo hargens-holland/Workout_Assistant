@@ -8,10 +8,13 @@
  * @module
  */
 
+import type * as chat from "../chat.js";
 import type * as http from "../http.js";
+import type * as mealLogs from "../mealLogs.js";
 import type * as plans from "../plans.js";
 import type * as splits from "../splits.js";
 import type * as users from "../users.js";
+import type * as workoutEditing from "../workoutEditing.js";
 
 import type {
   ApiFromModules,
@@ -20,10 +23,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  chat: typeof chat;
   http: typeof http;
+  mealLogs: typeof mealLogs;
   plans: typeof plans;
   splits: typeof splits;
   users: typeof users;
+  workoutEditing: typeof workoutEditing;
 }>;
 
 /**
