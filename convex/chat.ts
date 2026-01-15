@@ -124,7 +124,7 @@ Example: {"intent": "SWAP_EXERCISE", "confidence": 0.9, "params": {"exerciseName
         // Map LLM intent to internal intent type
         const internalIntent = mapLLMIntentToInternal(validated, context);
         console.log("🔍 [INTENT PARSING] Mapped to internal intent:", JSON.stringify(internalIntent, null, 2));
-        
+
         return internalIntent;
     } catch (error) {
         // [TEST LOG] Parsing/validation failure
@@ -148,7 +148,7 @@ function mapLLMIntentToInternal(
 ): Intent {
     // [TEST LOG] Mapping decision
     console.log("🔄 [INTENT MAPPING] Mapping LLM intent:", llmIntent.intent, "→ internal intent");
-    
+
     switch (llmIntent.intent) {
         case "SWAP_EXERCISE":
             return {

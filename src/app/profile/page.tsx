@@ -6,10 +6,13 @@ import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
 import ProfileHeader from "@/components/ProfileHeader";
 import NoFitnessPlan from "@/components/NoFitnessPlan";
-import CornerElements from "@/components/CornerElements";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Page } from "@/components/layout/Page";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { AppleIcon, CalendarIcon, DumbbellIcon, CheckIcon, Trash2Icon } from "lucide-react";
+import { cn } from "@/lib/utils";
 // Split types - defined locally for frontend
 type SplitType = "PPL" | "UPPER_LOWER" | "FULL_BODY" | "BRO_SPLIT" | "PUSH_PULL_LEGS_ARMS";
 import {
@@ -115,135 +118,129 @@ const ProfilePage = () => {
     };
 
     return (
-        <section className="relative z-10 pt-12 pb-32 flex-grow container mx-auto px-4">
+        <Page>
             <ProfileHeader user={user} />
 
-            <div className="max-w-4xl mx-auto space-y-6">
+            <div className="max-w-4xl mx-auto space-y-8">
                 {/* Rules Section */}
                 {activePlan && (
-                    <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                        <CornerElements />
-                        <h2 className="text-xl font-bold mb-4">
-                            <span className="text-primary">Rules</span> & Preferences
-                        </h2>
-                        <div className="space-y-4">
-                            <div>
-                                <div className="text-sm text-muted-foreground mb-1">Fitness Goal</div>
-                                <div className="font-semibold">
-                                    {activePlan?.trainingStrategy?.goal_type || "Not set"}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Rules & Preferences</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-1">Fitness Goal</div>
+                                    <div className="font-semibold">
+                                        {activePlan?.trainingStrategy?.goal_type || "Not set"}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-1">Primary Focus</div>
+                                    <div className="font-semibold">
+                                        {activePlan?.trainingStrategy?.primary_focus || "Not set"}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-1">Injuries / Limitations</div>
+                                    <div className="font-semibold">
+                                        {activePlan?.trainingStrategy?.recovery_notes || "None specified"}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-1">Dietary Preferences</div>
+                                    <div className="font-semibold">
+                                        {activePlan?.dietPlan?.meals?.length ? "Custom meal plan active" : "Not set"}
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <div className="text-sm text-muted-foreground mb-1">Primary Focus</div>
-                                <div className="font-semibold">
-                                    {activePlan?.trainingStrategy?.primary_focus || "Not set"}
-                                </div>
-                            </div>
-                            <div>
-                                <div className="text-sm text-muted-foreground mb-1">Injuries / Limitations</div>
-                                <div className="font-semibold">
-                                    {activePlan?.trainingStrategy?.recovery_notes || "None specified"}
-                                </div>
-                            </div>
-                            <div>
-                                <div className="text-sm text-muted-foreground mb-1">Dietary Preferences</div>
-                                <div className="font-semibold">
-                                    {activePlan?.dietPlan?.meals?.length ? "Custom meal plan active" : "Not set"}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {allPlans && allPlans?.length > 0 ? (
                     <div className="space-y-8">
                         {/* PLAN SELECTOR */}
-                        <div className="relative backdrop-blur-sm border border-border p-6">
-                        <CornerElements />
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-bold tracking-tight">
-                                <span className="text-primary">Your</span>{" "}
-                                <span className="text-foreground">Fitness Plans</span>
-                            </h2>
-                            <div className="font-mono text-xs text-muted-foreground">
-                                TOTAL: {allPlans.length}
-                            </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                            {allPlans.map((plan) => (
-                                <Button
-                                    key={plan._id}
-                                    onClick={() => setSelectedPlanId(plan._id)}
-                                    className={`text-foreground border hover:text-white ${selectedPlanId === plan._id
-                                        ? "bg-primary/20 text-primary border-primary"
-                                        : "bg-transparent border-border hover:border-primary/50"
-                                        }`}
-                                >
-                                    {plan.name}
-                                    {plan.isActive && (
-                                        <span className="ml-2 bg-green-500/20 text-green-500 text-xs px-2 py-0.5 rounded">
-                                            ACTIVE
-                                        </span>
-                                    )}
-                                </Button>
-                            ))}
-                        </div>
-                        </div>
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle>Your Fitness Plans</CardTitle>
+                                    <div className="text-xs text-muted-foreground">
+                                        TOTAL: {allPlans.length}
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-wrap gap-2">
+                                    {allPlans.map((plan) => (
+                                        <Button
+                                            key={plan._id}
+                                            onClick={() => setSelectedPlanId(plan._id)}
+                                            variant={selectedPlanId === plan._id ? "default" : "outline"}
+                                            className={cn(
+                                                selectedPlanId === plan._id && "bg-primary text-primary-foreground"
+                                            )}
+                                        >
+                                            {plan.name}
+                                            {plan.isActive && (
+                                                <span className="ml-2 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs px-2 py-0.5 rounded">
+                                                    ACTIVE
+                                                </span>
+                                            )}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
 
                         {/* PLAN DETAILS */}
 
                         {currentPlan && (
-                        <div className="relative backdrop-blur-sm border border-border rounded-lg p-6">
-                            <CornerElements />
-
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                                    <h3 className="text-lg font-bold">
-                                        PLAN: <span className="text-primary">{currentPlan.name}</span>
-                                    </h3>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {!currentPlan.isActive && (
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-primary"></div>
+                                        <CardTitle>
+                                            PLAN: <span className="text-primary">{currentPlan.name}</span>
+                                        </CardTitle>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {!currentPlan.isActive && (
+                                            <Button
+                                                onClick={() => handleSetActivePlan(currentPlan._id)}
+                                                variant="outline"
+                                                size="sm"
+                                                title="Activate this plan"
+                                            >
+                                                <CheckIcon className="h-4 w-4 mr-1" />
+                                                Activate
+                                            </Button>
+                                        )}
                                         <Button
-                                            onClick={() => handleSetActivePlan(currentPlan._id)}
+                                            onClick={() => handleDeletePlan(currentPlan._id)}
                                             variant="outline"
                                             size="sm"
-                                            className="border-primary/50 text-primary hover:bg-primary/10"
-                                            title="Activate this plan"
+                                            className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                                            title="Delete this plan"
                                         >
-                                            <CheckIcon className="h-4 w-4 mr-1" />
-                                            Activate
+                                            <Trash2Icon className="h-4 w-4 mr-1" />
+                                            Delete
                                         </Button>
-                                    )}
-                                    <Button
-                                        onClick={() => handleDeletePlan(currentPlan._id)}
-                                        variant="outline"
-                                        size="sm"
-                                        className="border-red-500/50 text-red-500 hover:bg-red-500/10"
-                                        title="Delete this plan"
-                                    >
-                                        <Trash2Icon className="h-4 w-4 mr-1" />
-                                        Delete
-                                    </Button>
+                                    </div>
                                 </div>
-                            </div>
+                            </CardHeader>
+                            <CardContent>
 
                             <Tabs defaultValue="workout" className="w-full">
-                                <TabsList className="mb-6 w-full grid grid-cols-2 bg-cyber-terminal-bg border">
-                                    <TabsTrigger
-                                        value="workout"
-                                        className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
-                                    >
+                                <TabsList className="mb-6 w-full grid grid-cols-2">
+                                    <TabsTrigger value="workout">
                                         <DumbbellIcon className="mr-2 size-4" />
                                         Workout Plan
                                     </TabsTrigger>
 
-                                    <TabsTrigger
-                                        value="diet"
-                                        className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
-                                    >
+                                    <TabsTrigger value="diet">
                                         <AppleIcon className="mr-2 h-4 w-4" />
                                         Diet Plan
                                     </TabsTrigger>
@@ -251,11 +248,11 @@ const ProfilePage = () => {
 
                                 <TabsContent value="workout">
                                     <div className="space-y-4">
-                                        <div className="flex items-center justify-between mb-4">
+                                        <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
                                             <div className="flex items-center gap-2">
                                                 <CalendarIcon className="h-4 w-4 text-primary" />
-                                                <span className="font-mono text-sm text-muted-foreground">
-                                                    SCHEDULE: {currentPlan.workoutPlan.schedule.join(", ")}
+                                                <span className="text-sm text-muted-foreground">
+                                                    Schedule: {currentPlan.workoutPlan.schedule.join(", ")}
                                                 </span>
                                             </div>
                                             {currentPlan.trainingStrategy && (
@@ -288,7 +285,7 @@ const ProfilePage = () => {
                                                             }
                                                         }}
                                                         disabled={changingSplit || !splitTypes}
-                                                        className="px-3 py-1 border border-border rounded bg-background text-sm"
+                                                        className="px-3 py-1.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                     >
                                                         {splitTypes && Object.entries(splitTypes).map(([key, value]) => (
                                                             <option key={key} value={key}>
@@ -303,18 +300,18 @@ const ProfilePage = () => {
                                             )}
                                         </div>
 
-                                        <Accordion type="multiple" className="space-y-4">
+                                        <Accordion type="multiple" className="space-y-3">
                                             {currentPlan?.workoutPlan?.exercises?.map((exerciseDay, index) => (
                                                 <AccordionItem
                                                     key={index}
                                                     value={exerciseDay.day}
                                                     className="border rounded-lg overflow-hidden"
                                                 >
-                                                    <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-primary/10 font-mono">
+                                                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
                                                         <div className="flex justify-between w-full items-center">
-                                                            <span className="text-primary">{exerciseDay.day}</span>
+                                                            <span className="font-semibold text-primary">{exerciseDay.day}</span>
                                                             <div className="text-xs text-muted-foreground">
-                                                                {exerciseDay.routines.length} EXERCISES
+                                                                {exerciseDay.routines.length} exercises
                                                             </div>
                                                         </div>
                                                     </AccordionTrigger>
@@ -324,18 +321,18 @@ const ProfilePage = () => {
                                                             {exerciseDay.routines.map((routine, routineIndex) => (
                                                                 <div
                                                                     key={routineIndex}
-                                                                    className="border border-border rounded p-3 bg-background/50"
+                                                                    className="rounded-xl p-4 bg-card/50 shadow-soft"
                                                                 >
                                                                     <div className="flex justify-between items-start mb-2">
-                                                                        <h4 className="font-semibold text-foreground">
+                                                                        <h4 className="font-semibold text-sm">
                                                                             {routine.name}
                                                                         </h4>
                                                                         <div className="flex items-center gap-2">
-                                                                            <div className="px-2 py-1 rounded bg-primary/20 text-primary text-xs font-mono">
-                                                                                {routine.sets} SETS
+                                                                            <div className="px-2 py-1 rounded bg-primary/10 text-primary text-xs font-medium">
+                                                                                {routine.sets} sets
                                                                             </div>
-                                                                            <div className="px-2 py-1 rounded bg-secondary/20 text-secondary text-xs font-mono">
-                                                                                {routine.reps} REPS
+                                                                            <div className="px-2 py-1 rounded bg-muted text-muted-foreground text-xs font-medium">
+                                                                                {routine.reps} reps
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -355,32 +352,31 @@ const ProfilePage = () => {
                                 </TabsContent>
 
                                 <TabsContent value="diet">
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <span className="font-mono text-sm text-muted-foreground">
-                                                DAILY CALORIE TARGET
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center p-4 rounded-lg bg-muted/30">
+                                            <span className="text-sm font-medium text-muted-foreground">
+                                                Daily Calorie Target
                                             </span>
-                                            <div className="font-mono text-xl text-primary">
-                                                {currentPlan.dietPlan.dailyCalories} KCAL
+                                            <div className="text-xl font-semibold text-primary">
+                                                {currentPlan.dietPlan.dailyCalories} kcal
                                             </div>
                                         </div>
 
-                                        <div className="h-px w-full bg-border my-4"></div>
-
-                                        <div className="flex justify-end mb-4">
+                                        <div className="flex justify-end">
                                             <Button
                                                 onClick={() => setShowAddMeal(!showAddMeal)}
                                                 variant="outline"
-                                                className="border-primary/50 text-primary hover:bg-primary/10"
                                             >
                                                 {showAddMeal ? "Cancel" : "+ Add Meal"}
                                             </Button>
                                         </div>
 
                                         {showAddMeal && (
-                                            <div className="border border-primary/50 rounded-lg p-4 bg-primary/5 mb-4">
-                                                <h4 className="font-semibold mb-3">Add New Meal</h4>
-                                                <div className="space-y-3">
+                                            <Card>
+                                                <CardHeader>
+                                                    <CardTitle>Add New Meal</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="space-y-3">
                                                     <input
                                                         type="text"
                                                         placeholder="Meal name (e.g., Snack)"
@@ -388,7 +384,7 @@ const ProfilePage = () => {
                                                         onChange={(e) =>
                                                             setNewMeal({ ...newMeal, name: e.target.value })
                                                         }
-                                                        className="w-full px-3 py-2 border border-border rounded bg-background"
+                                                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                     />
                                                     <input
                                                         type="text"
@@ -397,7 +393,7 @@ const ProfilePage = () => {
                                                         onChange={(e) =>
                                                             setNewMeal({ ...newMeal, foods: e.target.value })
                                                         }
-                                                        className="w-full px-3 py-2 border border-border rounded bg-background"
+                                                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                     />
                                                     <input
                                                         type="number"
@@ -409,7 +405,7 @@ const ProfilePage = () => {
                                                                 calories: parseInt(e.target.value) || 0,
                                                             })
                                                         }
-                                                        className="w-full px-3 py-2 border border-border rounded bg-background"
+                                                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                     />
                                                     <Button
                                                         onClick={handleAddMeal}
@@ -417,50 +413,50 @@ const ProfilePage = () => {
                                                     >
                                                         Add Meal
                                                     </Button>
-                                                </div>
-                                            </div>
+                                                </CardContent>
+                                            </Card>
                                         )}
 
-                                        <div className="space-y-4">
+                                        <div className="space-y-3">
                                             {currentPlan?.dietPlan?.meals?.map((meal, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="border border-border rounded-lg overflow-hidden p-4"
-                                                >
-                                                    <div className="flex items-center gap-2 mb-3">
-                                                        <div className="w-2 h-2 rounded-full bg-primary"></div>
-                                                        <h4 className="font-mono text-primary">{meal.name}</h4>
-                                                        <span className="text-xs text-muted-foreground ml-auto">
-                                                            {meal.calories} kcal
-                                                        </span>
-                                                    </div>
-                                                    <ul className="space-y-2">
-                                                        {meal.foods.map((food, foodIndex) => (
-                                                            <li
-                                                                key={foodIndex}
-                                                                className="flex items-center gap-2 text-sm text-muted-foreground"
-                                                            >
-                                                                <span className="text-xs text-primary font-mono">
-                                                                    {String(foodIndex + 1).padStart(2, "0")}
-                                                                </span>
-                                                                {food}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
+                                                <Card key={index}>
+                                                    <CardContent className="pt-6">
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <div className="w-2 h-2 rounded-full bg-primary"></div>
+                                                            <h4 className="font-semibold text-primary">{meal.name}</h4>
+                                                            <span className="text-xs text-muted-foreground ml-auto">
+                                                                {meal.calories} kcal
+                                                            </span>
+                                                        </div>
+                                                        <ul className="space-y-2">
+                                                            {meal.foods.map((food, foodIndex) => (
+                                                                <li
+                                                                    key={foodIndex}
+                                                                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                                                                >
+                                                                    <span className="text-xs text-primary font-medium">
+                                                                        {String(foodIndex + 1).padStart(2, "0")}
+                                                                    </span>
+                                                                    {food}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </CardContent>
+                                                </Card>
                                             ))}
                                         </div>
                                     </div>
                                 </TabsContent>
                             </Tabs>
-                        </div>
+                            </CardContent>
+                        </Card>
                         )}
                     </div>
                 ) : (
                     <NoFitnessPlan />
                 )}
             </div>
-        </section>
+        </Page>
     );
 };
 export default ProfilePage;

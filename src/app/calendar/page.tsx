@@ -4,9 +4,12 @@ import { useUser } from "@clerk/nextjs";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState, useMemo } from "react";
-import { CalendarIcon, DumbbellIcon, AppleIcon, Trash2Icon, CheckIcon, RefreshCwIcon, BanIcon, MoveIcon } from "lucide-react";
-import CornerElements from "@/components/CornerElements";
+import { CalendarIcon, DumbbellIcon, AppleIcon, Trash2Icon, CheckIcon, RefreshCwIcon, BanIcon } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Page } from "@/components/layout/Page";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const CalendarPage = () => {
     const { user } = useUser();
@@ -177,168 +180,129 @@ const CalendarPage = () => {
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
     return (
-        <section className="relative z-10 pt-12 pb-32 flex-grow container mx-auto px-4">
-            <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                <CornerElements />
-                <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-                    <h1 className="text-2xl font-bold tracking-tight">
-                        <span className="text-primary">Training</span>{" "}
-                        <span className="text-foreground">Calendar</span>
-                    </h1>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {allPlans && allPlans.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <select
-                                    value={activePlan?._id || ""}
-                                    onChange={(e) => {
-                                        if (e.target.value && convexUser?._id) {
-                                            handleSetActivePlan(e.target.value);
-                                        }
-                                    }}
-                                    className="px-3 py-2 border border-border rounded bg-background text-foreground"
-                                >
-                                    {allPlans.map((plan) => (
-                                        <option key={plan._id} value={plan._id}>
-                                            {plan.name} {plan.isActive ? "✓" : ""}
-                                        </option>
-                                    ))}
-                                </select>
-                                {activePlan && (
-                                    <>
-                                        <Button
-                                            onClick={() => handleSetActivePlan(activePlan._id)}
-                                            variant="outline"
-                                            size="sm"
-                                            className="border-primary/50 text-primary hover:bg-primary/10"
-                                            title="Activate this plan"
-                                        >
-                                            <CheckIcon className="h-4 w-4 mr-1" />
-                                            Activate
-                                        </Button>
-                                        <Button
-                                            onClick={() => handleDeletePlan(activePlan._id)}
-                                            variant="outline"
-                                            size="sm"
-                                            className="border-red-500/50 text-red-500 hover:bg-red-500/10"
-                                            title="Delete this plan"
-                                        >
-                                            <Trash2Icon className="h-4 w-4 mr-1" />
-                                            Delete
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                        {activePlan && (
+        <Page>
+            <div className="max-w-6xl mx-auto space-y-8">
+                <PageHeader
+                    title="Training Calendar"
+                    description="View and manage your workout schedule"
+                    action={
+                        activePlan && (
                             <Button
                                 onClick={handleGenerateWorkouts}
                                 className="bg-primary text-primary-foreground hover:bg-primary/90"
                             >
                                 Generate Workouts
                             </Button>
-                        )}
-                    </div>
-                </div>
-
+                        )
+                    }
+                />
                 {!activePlan ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                        <p>No active plan found. Create a plan first.</p>
-                    </div>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="text-center py-12 text-muted-foreground">
+                                <p>No active plan found. Create a plan first.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 ) : allWorkoutSessions && allWorkoutSessions.length > 0 && workouts && workouts.length === 0 ? (
-                    <div className="text-center py-12">
-                        <p className="text-muted-foreground mb-2">
-                            You have {allWorkoutSessions.length} workout{allWorkoutSessions.length !== 1 ? "s" : ""} scheduled, but none in this month.
-                        </p>
-                        <p className="text-sm text-muted-foreground mb-4">
-                            Workout dates: {allWorkoutSessions.slice(0, 5).map(s => s.date).join(", ")}
-                            {allWorkoutSessions.length > 5 && "..."}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                            Try navigating to a different month to see your workouts.
-                        </p>
-                    </div>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="text-center py-12">
+                                <p className="text-muted-foreground mb-2">
+                                    You have {allWorkoutSessions.length} workout{allWorkoutSessions.length !== 1 ? "s" : ""} scheduled, but none in this month.
+                                </p>
+                                <p className="text-sm text-muted-foreground mb-4">
+                                    Workout dates: {allWorkoutSessions.slice(0, 5).map(s => s.date).join(", ")}
+                                    {allWorkoutSessions.length > 5 && "..."}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    Try navigating to a different month to see your workouts.
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 ) : (
                     <>
-                        <div className="mb-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => navigateMonth("prev")}
-                                    className="border-primary/50 text-primary"
-                                >
-                                    ← Prev
-                                </Button>
-                                <h2 className="text-xl font-semibold">
-                                    {viewMonth.toLocaleDateString("en-US", {
-                                        month: "long",
-                                        year: "numeric",
-                                    })}
-                                </h2>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => navigateMonth("next")}
-                                    className="border-primary/50 text-primary"
-                                >
-                                    Next →
-                                </Button>
-                            </div>
-
-                            <div className="grid grid-cols-7 gap-2">
-                                {dayNames.map((day) => (
-                                    <div
-                                        key={day}
-                                        className="text-center text-sm font-semibold text-muted-foreground py-2"
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center justify-between mb-6">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => navigateMonth("prev")}
                                     >
-                                        {day}
-                                    </div>
-                                ))}
-                                {days.map((day, idx) => {
-                                    const dateStr = getDateString(day);
-                                    const isSelected = dateStr === selectedDate;
-                                    const workoutExists = hasWorkout(dateStr);
-                                    const isToday =
-                                        dateStr ===
-                                        new Date().toISOString().split("T")[0];
+                                        ← Prev
+                                    </Button>
+                                    <h2 className="text-xl font-semibold">
+                                        {viewMonth.toLocaleDateString("en-US", {
+                                            month: "long",
+                                            year: "numeric",
+                                        })}
+                                    </h2>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => navigateMonth("next")}
+                                    >
+                                        Next →
+                                    </Button>
+                                </div>
 
-                                    return (
-                                        <button
-                                            key={idx}
-                                            onClick={() =>
-                                                day && setSelectedDate(dateStr)
-                                            }
-                                            disabled={!day}
-                                            className={`
-                                                aspect-square p-2 rounded border transition-colors
-                                                ${!day ? "border-transparent" : ""}
-                                                ${isSelected
-                                                    ? "bg-primary/20 border-primary text-primary"
-                                                    : "border-border hover:border-primary/50"}
-                                                ${isToday ? "ring-2 ring-primary/50" : ""}
-                                                ${workoutExists ? "bg-green-500/10" : ""}
-                                            `}
+                                <div className="grid grid-cols-7 gap-2">
+                                    {dayNames.map((day) => (
+                                        <div
+                                            key={day}
+                                            className="text-center text-sm font-semibold text-muted-foreground py-2"
                                         >
-                                            {day && (
-                                                <>
-                                                    <div className="text-sm font-semibold">
-                                                        {day}
-                                                    </div>
-                                                    {workoutExists && (
-                                                        <div className="w-2 h-2 bg-primary rounded-full mx-auto mt-1" />
-                                                    )}
-                                                </>
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                                            {day}
+                                        </div>
+                                    ))}
+                                    {days.map((day, idx) => {
+                                        const dateStr = getDateString(day);
+                                        const isSelected = dateStr === selectedDate;
+                                        const workoutExists = hasWorkout(dateStr);
+                                        const isToday =
+                                            dateStr ===
+                                            new Date().toISOString().split("T")[0];
+
+                                        return (
+                                            <button
+                                                key={idx}
+                                                onClick={() =>
+                                                    day && setSelectedDate(dateStr)
+                                                }
+                                                disabled={!day}
+                                                className={cn(
+                                                    "aspect-square p-2 rounded-lg border transition-colors",
+                                                    !day && "border-transparent",
+                                                    isSelected
+                                                        ? "bg-primary/10 border-primary text-primary"
+                                                        : "border-border hover:border-primary/50 hover:bg-accent/50",
+                                                    isToday && "ring-2 ring-primary/30",
+                                                    workoutExists && "bg-green-50 dark:bg-green-950/20"
+                                                )}
+                                            >
+                                                {day && (
+                                                    <>
+                                                        <div className="text-sm font-semibold">
+                                                            {day}
+                                                        </div>
+                                                        {workoutExists && (
+                                                            <div className="w-2 h-2 bg-primary rounded-full mx-auto mt-1" />
+                                                        )}
+                                                    </>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </CardContent>
+                        </Card>
 
                         {selectedWorkout && (
-                            <div className="mt-6 border border-border rounded-lg p-6 bg-background/50">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="flex items-center gap-2">
-                                        <CalendarIcon className="h-5 w-5 text-primary" />
-                                        <h3 className="text-lg font-bold">
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2">
+                                            <CalendarIcon className="h-5 w-5 text-primary" />
                                             {new Date(selectedWorkout.date).toLocaleDateString(
                                                 "en-US",
                                                 {
@@ -348,57 +312,20 @@ const CalendarPage = () => {
                                                     day: "numeric",
                                                 }
                                             )}
-                                        </h3>
+                                        </CardTitle>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="date"
-                                            value={rescheduleDate}
-                                            onChange={(e) => setRescheduleDate(e.target.value)}
-                                            className="px-3 py-1 border border-border rounded bg-background text-sm"
-                                        />
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={async () => {
-                                                if (!rescheduleDate) {
-                                                    alert("Please select a date");
-                                                    return;
-                                                }
-                                                if (!confirm(`Move this workout to ${new Date(rescheduleDate).toLocaleDateString()}?`)) {
-                                                    return;
-                                                }
-                                                try {
-                                                    await moveWorkoutSession({
-                                                        sessionId: selectedWorkout._id,
-                                                        newDate: rescheduleDate,
-                                                    });
-                                                    setRescheduleDate("");
-                                                    alert("Workout moved successfully");
-                                                } catch (error) {
-                                                    alert(`Failed to move workout: ${error instanceof Error ? error.message : String(error)}`);
-                                                }
-                                            }}
-                                            disabled={!rescheduleDate}
-                                        >
-                                            <MoveIcon className="h-4 w-4 mr-1" />
-                                            Move
-                                        </Button>
-                                    </div>
-                                </div>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
 
-                                <div className="mb-4">
-                                    <div className="flex items-center gap-2">
+                                    <div>
                                         <span className="text-sm text-muted-foreground">
                                             Week {selectedWorkout.weekNumber} •{" "}
                                             {selectedWorkout.intensity}
                                         </span>
                                     </div>
-                                </div>
 
-                                <div className="space-y-4">
                                     <div>
-                                        <div className="flex items-center gap-2 mb-3">
+                                        <div className="flex items-center gap-2 mb-4">
                                             <DumbbellIcon className="h-4 w-4 text-primary" />
                                             <h4 className="font-semibold">Workout</h4>
                                         </div>
@@ -488,13 +415,18 @@ const CalendarPage = () => {
                                                     return (
                                                         <div
                                                             key={idx}
-                                                            className={`border border-border rounded p-3 bg-background/50 ${allCompleted ? "bg-green-500/10 border-green-500/50" : ""}`}
+                                                            className={cn(
+                                                                "rounded-lg border p-4",
+                                                                allCompleted 
+                                                                    ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800" 
+                                                                    : "bg-card border-border"
+                                                            )}
                                                         >
-                                                            <div className="font-semibold mb-2 flex items-center justify-between">
+                                                            <div className="font-semibold mb-3 flex items-center justify-between">
                                                                 <span>{exercise?.name || "Unknown Exercise"}</span>
                                                                 <div className="flex items-center gap-2">
                                                                     {allCompleted && (
-                                                                        <span className="text-xs bg-green-500/20 text-green-500 px-2 py-1 rounded">
+                                                                        <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded">
                                                                             ✓ Complete
                                                                         </span>
                                                                     )}
@@ -541,7 +473,7 @@ const CalendarPage = () => {
                                                                                     alert("Failed to block exercise");
                                                                                 }
                                                                             }}
-                                                                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                                                            className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
                                                                             title="Block this exercise"
                                                                         >
                                                                             <BanIcon className="h-3 w-3" />
@@ -558,7 +490,12 @@ const CalendarPage = () => {
                                                                         return (
                                                                             <div
                                                                                 key={setIdx}
-                                                                                className={`flex items-center justify-between p-2 rounded ${set.completed ? "bg-green-500/10" : "bg-background/30"}`}
+                                                                                className={cn(
+                                                                                    "flex items-center justify-between p-2 rounded",
+                                                                                    set.completed 
+                                                                                        ? "bg-green-50 dark:bg-green-950/20" 
+                                                                                        : "bg-muted/30"
+                                                                                )}
                                                                             >
                                                                                 <div className="flex-1">
                                                                                     <div className="font-medium">
@@ -574,7 +511,7 @@ const CalendarPage = () => {
                                                                                                     [setKey]: { ...editData, weight: e.target.value },
                                                                                                 })}
                                                                                                 placeholder="Weight"
-                                                                                                className="w-20 px-2 py-1 border border-border rounded bg-background text-sm"
+                                                                                                className="w-20 px-2 py-1 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                                                             />
                                                                                             <span className="text-muted-foreground">lbs ×</span>
                                                                                             <input
@@ -585,7 +522,7 @@ const CalendarPage = () => {
                                                                                                     [setKey]: { ...editData, reps: e.target.value },
                                                                                                 })}
                                                                                                 placeholder="Reps"
-                                                                                                className="w-20 px-2 py-1 border border-border rounded bg-background text-sm"
+                                                                                                className="w-20 px-2 py-1 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                                                                                             />
                                                                                             <Button
                                                                                                 size="sm"
@@ -607,9 +544,12 @@ const CalendarPage = () => {
                                                                                             </Button>
                                                                                         </div>
                                                                                     ) : (
-                                                                                        <div className="text-muted-foreground">
+                                                                                        <div className={cn(
+                                                                                            "text-muted-foreground",
+                                                                                            set.actualWeight && set.actualReps && "text-green-600 dark:text-green-400"
+                                                                                        )}>
                                                                                             {set.actualWeight && set.actualReps ? (
-                                                                                                <span className="text-green-500">
+                                                                                                <span>
                                                                                                     {set.actualWeight} lbs × {set.actualReps} reps
                                                                                                 </span>
                                                                                             ) : (
@@ -625,7 +565,7 @@ const CalendarPage = () => {
                                                                                         size="sm"
                                                                                         variant={set.completed ? "outline" : "default"}
                                                                                         onClick={() => handleSetComplete(set)}
-                                                                                        className={set.completed ? "border-green-500 text-green-500" : ""}
+                                                                                        className={set.completed ? "border-green-600 text-green-600 dark:border-green-400 dark:text-green-400" : ""}
                                                                                     >
                                                                                         {set.completed ? "✓" : "Complete"}
                                                                                     </Button>
@@ -643,7 +583,7 @@ const CalendarPage = () => {
 
                                     {selectedWorkout.meals && selectedWorkout.meals.length > 0 && (
                                         <div>
-                                            <div className="flex items-center gap-2 mb-3">
+                                            <div className="flex items-center gap-2 mb-4">
                                                 <AppleIcon className="h-4 w-4 text-primary" />
                                                 <h4 className="font-semibold">Meals</h4>
                                             </div>
@@ -666,13 +606,18 @@ const CalendarPage = () => {
                                                         return (
                                                             <div
                                                                 key={mealIdx}
-                                                                className={`border border-border rounded p-3 bg-background/50 flex items-center justify-between ${dailyMeal.completed ? "bg-green-500/10 border-green-500/50" : ""}`}
+                                                                className={cn(
+                                                                    "rounded-lg border p-3 flex items-center justify-between",
+                                                                    dailyMeal.completed 
+                                                                        ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800" 
+                                                                        : "bg-card border-border"
+                                                                )}
                                                             >
                                                                 <div className="flex-1">
-                                                                    <div className="font-semibold mb-1 flex items-center gap-2">
+                                                                    <div className="font-semibold mb-1 flex items-center gap-2 text-sm">
                                                                         <span className="capitalize">{dailyMeal.mealType}</span>
                                                                         {dailyMeal.completed && (
-                                                                            <span className="text-xs bg-green-500/20 text-green-500 px-2 py-0.5 rounded">
+                                                                            <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded">
                                                                                 ✓
                                                                             </span>
                                                                         )}
@@ -681,11 +626,11 @@ const CalendarPage = () => {
                                                                         {meal?.name || "Unknown Meal"}
                                                                     </div>
                                                                     {meal?.foods && (
-                                                                        <div className="text-xs text-muted-foreground mt-1">
+                                                                        <div className="text-xs text-muted-foreground mt-0.5">
                                                                             {meal.foods.join(", ")}
                                                                         </div>
                                                                     )}
-                                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                                    <div className="text-xs text-muted-foreground mt-0.5">
                                                                         {meal?.calories || 0} kcal
                                                                     </div>
                                                                 </div>
@@ -731,7 +676,7 @@ const CalendarPage = () => {
                                                                                     alert("Failed to block meal");
                                                                                 }
                                                                             }}
-                                                                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                                                                            className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
                                                                             title="Block this meal"
                                                                         >
                                                                             <BanIcon className="h-3 w-3" />
@@ -741,7 +686,7 @@ const CalendarPage = () => {
                                                                         size="sm"
                                                                         variant={dailyMeal.completed ? "outline" : "default"}
                                                                         onClick={handleMealComplete}
-                                                                        className={dailyMeal.completed ? "border-green-500 text-green-500" : ""}
+                                                                        className={dailyMeal.completed ? "border-green-600 text-green-600 dark:border-green-400 dark:text-green-400" : ""}
                                                                     >
                                                                         {dailyMeal.completed ? "✓" : "Complete"}
                                                                     </Button>
@@ -753,19 +698,23 @@ const CalendarPage = () => {
                                             </div>
                                         </div>
                                     )}
-                                </div>
-                            </div>
+                                </CardContent>
+                            </Card>
                         )}
 
                         {!selectedWorkout && selectedDate && (
-                            <div className="mt-6 border border-border rounded-lg p-6 bg-background/50 text-center text-muted-foreground">
-                                <p>No workout scheduled for this date.</p>
-                            </div>
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="text-center py-12 text-muted-foreground">
+                                        <p>No workout scheduled for this date.</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         )}
                     </>
                 )}
             </div>
-        </section>
+        </Page>
     );
 };
 

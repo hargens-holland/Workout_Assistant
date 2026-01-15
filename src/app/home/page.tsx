@@ -3,11 +3,14 @@
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import CornerElements from "@/components/CornerElements";
-import { DumbbellIcon, AppleIcon, CheckIcon, PlusIcon } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Page } from "@/components/layout/Page";
+import { DumbbellIcon, CheckIcon, PlusIcon, ArrowUpRightIcon, PencilIcon, DropletIcon, AppleIcon, MessageSquareIcon, SendIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 const HomePage = () => {
     const { user } = useUser();
@@ -46,14 +49,25 @@ const HomePage = () => {
 
     const createMealLog = useMutation(api.mealLogs.createMealLog);
     const updateExerciseSet = useMutation(api.plans.updateExerciseSet);
-    const generateNextWorkout = useAction(api.plans.generateNextWorkout);
     const generateTodayWorkout = useAction(api.plans.generateWorkoutsFromStrategy);
+    const chatCommand = useAction(api.chat.chatCommand);
 
     const [newMealLog, setNewMealLog] = useState({
         name: "",
         calories: "",
         protein: "",
     });
+
+    const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
+        {
+            role: "assistant",
+            content: "Hi! I'm your fitness coach. You can ask me to:\n- Swap exercises (e.g., 'swap squats for something knee-friendly')\n- Make workouts easier (e.g., 'make today easier')\n- Add focus areas (e.g., 'add more arms this week')\n- Get meal suggestions (e.g., 'what should I eat tonight?')\n- Log meals (e.g., 'log chicken salad 450 calories 40 protein')\n- Move workouts (e.g., 'move Friday workout to Saturday')\n- Block items (e.g., 'never show burpees again')",
+        },
+    ]);
+    const [chatInput, setChatInput] = useState("");
+    const [chatLoading, setChatLoading] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
 
     // Calculate nutrition stats
     const targetCalories = activePlan?.dietPlan?.dailyCalories || 0;
@@ -62,11 +76,6 @@ const HomePage = () => {
         return sum + (dm.meal?.calories || 0);
     }, 0) || 0;
     const totalCalories = loggedCalories + plannedMealCalories;
-
-    // Calculate protein (heuristic: 0.7g per lb of body weight, or use logged)
-    const estimatedWeight = 150; // Default, could come from user profile
-    const proteinTarget = Math.round(estimatedWeight * 0.7);
-    const loggedProtein = todayMealLogs?.reduce((sum, log) => sum + (log.protein || 0), 0) || 0;
 
     // Get workouts completed this week
     const weekStart = new Date();
@@ -86,10 +95,48 @@ const HomePage = () => {
             : "skip"
     );
 
-    const completedThisWeek = weekWorkouts?.filter((w) => {
-        const allCompleted = w.exercises.every((e: any) => e.completed);
-        return allCompleted;
-    }).length || 0;
+    // Calculate weekly workout hours
+    const weekWorkoutHours = weekWorkouts?.reduce((total, w) => {
+        const completed = w.exercises.every((e: any) => e.completed);
+        if (completed) {
+            // Estimate 1 hour per workout
+            return total + 1;
+        }
+        return total;
+    }, 0) || 0;
+
+    // Calculate daily goals completion
+    const dailyGoals = [
+        { id: 1, label: "Sleep 7+ hours", completed: true, icon: "😴" },
+        { id: 2, label: "Drink 2L of water", completed: false, icon: "💧" },
+        { id: 3, label: "Complete workout", completed: todayWorkout?.exercises?.every((e: any) => e.completed) || false, icon: "💪" },
+        { id: 4, label: "10 000 Steps", completed: false, icon: "🚶" },
+        { id: 5, label: "1 500 Calories", completed: totalCalories >= 1500, icon: "🍎" },
+    ];
+    const completedGoals = dailyGoals.filter(g => g.completed).length;
+    const goalsProgress = (completedGoals / dailyGoals.length) * 100;
+
+    // Water intake (mock data - would come from user data)
+    const waterIntake = 0.7; // liters
+    const waterTarget = 2.0; // liters
+
+    // Steps (mock data)
+    const steps = 5400; // steps
+    const stepsTarget = 10000; // steps
+    const stepsKm = (steps * 0.0008).toFixed(1); // approximate conversion
+    const stepsProgress = (steps / stepsTarget) * 100;
+
+    // Workout chart data (days of week)
+    const days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+    const currentDay = new Date().getDay();
+    const workoutChartData = days.map((day, idx) => {
+        const dayIndex = idx === 0 ? 6 : idx - 1; // Monday is 0 in our array
+        return {
+            day,
+            hours: idx === currentDay - 1 ? 1.5 : idx < currentDay ? Math.random() * 2 : 0,
+            isToday: idx === currentDay - 1,
+        };
+    });
 
     const handleAddMealLog = async () => {
         if (!convexUser?._id || !newMealLog.name || !newMealLog.calories) return;
@@ -120,240 +167,591 @@ const HomePage = () => {
         }
     };
 
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [chatMessages]);
+
+    const handleChatSend = async () => {
+        if (!chatInput.trim() || !convexUser?._id || chatLoading) return;
+
+        const userMessage = { role: "user" as const, content: chatInput.trim() };
+        setChatMessages((prev) => [...prev, userMessage]);
+        setChatInput("");
+        setChatLoading(true);
+
+        try {
+            const response = await chatCommand({
+                userId: convexUser._id,
+                message: chatInput.trim(),
+                date: today,
+            });
+
+            setChatMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: response.message },
+            ]);
+        } catch (error) {
+            setChatMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: `Error: ${error instanceof Error ? error.message : "Unknown error"}` },
+            ]);
+        } finally {
+            setChatLoading(false);
+        }
+    };
+
+    // Get today's meals from workout session
+    const todayMealsList = todayMeals?.[0]?.meals || [];
+    const plannedMeals = todayMealsList.map((dm: any) => ({
+        name: dm.meal?.name || "Unknown",
+        calories: dm.meal?.calories || 0,
+        mealType: dm.mealType,
+    }));
+
     if (!convexUser) {
         return (
-            <section className="relative z-10 pt-12 pb-32 flex-grow container mx-auto px-4">
-                <div className="text-center text-muted-foreground">Loading...</div>
-            </section>
+            <div className="min-h-screen bg-[#0B0F14] flex items-center justify-center">
+                <div className="text-center text-[#9AA3B2]">Loading...</div>
+            </div>
         );
     }
 
     if (!activePlan) {
         return (
-            <section className="relative z-10 pt-12 pb-32 flex-grow container mx-auto px-4">
-                <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                    <CornerElements />
-                    <div className="text-center">
-                        <h2 className="text-xl font-bold mb-4">No Active Plan</h2>
-                        <p className="text-muted-foreground mb-4">
-                            Create a plan to get started with your daily workouts and meals.
-                        </p>
-                        <Button asChild>
-                            <Link href="/generate-program">Create Plan</Link>
-                        </Button>
-                    </div>
-                </div>
-            </section>
+            <div className="min-h-screen bg-[#0B0F14] flex items-center justify-center px-4">
+                <Card className="max-w-2xl w-full">
+                    <CardContent className="pt-6">
+                        <div className="text-center space-y-4">
+                            <h2 className="text-2xl font-semibold text-[#E6EAF0]">No Active Plan</h2>
+                            <p className="text-[#9AA3B2]">
+                                Create a plan to get started with your daily workouts and meals.
+                            </p>
+                            <Button asChild className="mt-4">
+                                <Link href="/generate-program">Create Plan</Link>
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         );
     }
 
+    const userName = user?.firstName || user?.emailAddresses[0]?.emailAddress?.split("@")[0] || "User";
+
     return (
-        <section className="relative z-10 pt-12 pb-32 flex-grow container mx-auto px-4">
-            <div className="max-w-4xl mx-auto space-y-6">
-                <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                    <CornerElements />
-                    <h1 className="text-2xl font-bold mb-6">
-                        <span className="text-primary">Today</span> - {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+        <div className="min-h-screen bg-[#0B0F14]">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* Greeting */}
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-8"
+                >
+                    <h1 className="text-4xl sm:text-5xl font-semibold text-[#E6EAF0]">
+                        Hello, <span className="text-[#C7F000]">{userName}</span>
                     </h1>
+                </motion.div>
 
-                    {/* Quick Insights */}
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                        <div className="bg-background/50 p-4 rounded border border-border">
-                            <div className="text-sm text-muted-foreground">Workouts This Week</div>
-                            <div className="text-2xl font-bold text-primary">{completedThisWeek}</div>
-                        </div>
-                        <div className="bg-background/50 p-4 rounded border border-border">
-                            <div className="text-sm text-muted-foreground">Calories</div>
-                            <div className="text-2xl font-bold">
-                                {totalCalories} / {targetCalories}
-                            </div>
-                        </div>
-                        <div className="bg-background/50 p-4 rounded border border-border">
-                            <div className="text-sm text-muted-foreground">Protein</div>
-                            <div className="text-2xl font-bold">
-                                {loggedProtein}g / {proteinTarget}g
-                            </div>
-                            {loggedProtein < proteinTarget * 0.7 && (
-                                <div className="text-xs text-yellow-500 mt-1">Low protein warning</div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Today's Workout */}
-                    <div className="mb-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-semibold flex items-center gap-2">
-                                <DumbbellIcon className="h-5 w-5 text-primary" />
-                                Today's Workout
-                            </h2>
-                            {!todayWorkout && (
-                                <Button onClick={handleGenerateToday} size="sm">
-                                    Generate Today
-                                </Button>
-                            )}
-                        </div>
-
-                        {todayWorkout ? (
-                            <div className="space-y-3">
-                                {todayWorkout.exercises
-                                    .filter((e: any, idx: number, arr: any[]) => 
-                                        arr.findIndex((x: any) => x.exercise?._id === e.exercise?._id) === idx
-                                    )
-                                    .map((exerciseSet: any, idx: number) => {
-                                        const exercise = exerciseSet.exercise;
-                                        const setsForExercise = todayWorkout.exercises.filter(
-                                            (e: any) => e.exercise?._id === exercise?._id
-                                        );
-                                        const allCompleted = setsForExercise.every((s: any) => s.completed);
-
-                                        return (
+                {/* Organic Card Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Workouts Card - Top Left */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="lg:col-span-4"
+                    >
+                        <Card className="h-full">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-[#E6EAF0]">Workouts</CardTitle>
+                                    <button className="size-8 rounded-full bg-[#161B22] flex items-center justify-center text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#1B212B] transition-all">
+                                        <ArrowUpRightIcon size={16} />
+                                    </button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                {/* Bar Chart */}
+                                <div className="flex items-end justify-between gap-2 mb-4 h-24">
+                                    {workoutChartData.map((item, idx) => (
+                                        <div key={idx} className="flex-1 flex flex-col items-center gap-2">
                                             <div
-                                                key={idx}
-                                                className={`border border-border rounded p-3 bg-background/50 ${
-                                                    allCompleted ? "bg-green-500/10 border-green-500/50" : ""
-                                                }`}
-                                            >
-                                                <div className="font-semibold mb-2 flex items-center justify-between">
-                                                    <span>{exercise?.name || "Unknown"}</span>
-                                                    {allCompleted && (
-                                                        <CheckIcon className="h-4 w-4 text-green-500" />
-                                                    )}
-                                                </div>
-                                                <div className="space-y-1 text-sm">
-                                                    {setsForExercise.map((set: any, setIdx: number) => (
-                                                        <div
-                                                            key={setIdx}
-                                                            className={`flex items-center justify-between ${
-                                                                set.completed ? "text-green-500" : ""
-                                                            }`}
-                                                        >
-                                                            <span>
-                                                                Set {set.setNumber}: {set.actualWeight || set.plannedWeight} lbs × {set.actualReps || set.plannedReps} reps
-                                                            </span>
-                                                            {!set.completed && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    onClick={async () => {
-                                                                        try {
-                                                                            await updateExerciseSet({
-                                                                                setId: set._id,
-                                                                                actualWeight: set.plannedWeight,
-                                                                                actualReps: set.plannedReps,
-                                                                                completed: true,
-                                                                            });
-                                                                        } catch (error) {
-                                                                            alert("Failed to complete set");
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    Complete
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                <Link href="/workouts">
-                                    <Button variant="outline" className="w-full mt-4">
-                                        View Full Workout
-                                    </Button>
-                                </Link>
-                            </div>
-                        ) : (
-                            <div className="text-center py-8 text-muted-foreground border border-border rounded">
-                                <p>No workout scheduled for today.</p>
-                                <p className="text-sm mt-2">Rest day or generate a workout above.</p>
-                            </div>
-                        )}
-                    </div>
+                                                className={cn(
+                                                    "w-full rounded-t transition-all",
+                                                    item.isToday
+                                                        ? "bg-[#C7F000] h-full"
+                                                        : item.hours > 0
+                                                        ? "bg-[#E6EAF0] h-full"
+                                                        : "bg-[#6B7280] h-2"
+                                                )}
+                                                style={{
+                                                    height: item.hours > 0 ? `${Math.min(100, (item.hours / 2) * 100)}%` : "8px",
+                                                }}
+                                            />
+                                            <span className={cn(
+                                                "text-xs",
+                                                item.isToday ? "text-[#C7F000]" : "text-[#6B7280]"
+                                            )}>
+                                                {item.day}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-[#9AA3B2]">Total</span>
+                                    <span className="text-xl font-semibold text-[#E6EAF0]">{weekWorkoutHours}h</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
 
-                    {/* Today's Nutrition */}
-                    <div>
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-semibold flex items-center gap-2">
-                                <AppleIcon className="h-5 w-5 text-primary" />
-                                Today's Nutrition
-                            </h2>
-                        </div>
-
-                        <div className="mb-4">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm text-muted-foreground">Calories</span>
-                                <span className="font-semibold">
-                                    {totalCalories} / {targetCalories}
-                                </span>
-                            </div>
-                            <div className="w-full bg-background/50 rounded-full h-2">
-                                <div
-                                    className="bg-primary h-2 rounded-full"
-                                    style={{ width: `${Math.min(100, (totalCalories / targetCalories) * 100)}%` }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Quick Add Meal Log */}
-                        <div className="border border-border rounded p-4 mb-4 bg-background/50">
-                            <h3 className="font-semibold mb-3">Quick Log Meal</h3>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="Meal name"
-                                    value={newMealLog.name}
-                                    onChange={(e) => setNewMealLog({ ...newMealLog, name: e.target.value })}
-                                    className="flex-1 px-3 py-2 border border-border rounded bg-background"
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Calories"
-                                    value={newMealLog.calories}
-                                    onChange={(e) => setNewMealLog({ ...newMealLog, calories: e.target.value })}
-                                    className="w-24 px-3 py-2 border border-border rounded bg-background"
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Protein (g)"
-                                    value={newMealLog.protein}
-                                    onChange={(e) => setNewMealLog({ ...newMealLog, protein: e.target.value })}
-                                    className="w-24 px-3 py-2 border border-border rounded bg-background"
-                                />
-                                <Button onClick={handleAddMealLog} size="sm">
-                                    <PlusIcon className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Today's Logs */}
-                        {todayMealLogs && todayMealLogs.length > 0 && (
-                            <div className="space-y-2">
-                                <h3 className="font-semibold text-sm">Logged Meals</h3>
-                                {todayMealLogs.map((log) => (
-                                    <div
-                                        key={log._id}
-                                        className="flex items-center justify-between p-2 border border-border rounded bg-background/50"
-                                    >
-                                        <div>
-                                            <div className="font-medium">{log.name}</div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {log.calories} cal{log.protein ? ` • ${log.protein}g protein` : ""}
+                    {/* Steps Card - Middle Left */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="lg:col-span-4"
+                    >
+                        <Card className="h-full">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-[#E6EAF0]">Steps</CardTitle>
+                                    <button className="size-8 rounded-full bg-[#161B22] flex items-center justify-center text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#1B212B] transition-all">
+                                        <ArrowUpRightIcon size={16} />
+                                    </button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                {/* Circular Progress */}
+                                <div className="flex items-center justify-center mb-4">
+                                    <div className="relative size-32">
+                                        <svg className="transform -rotate-90 size-32">
+                                            <circle
+                                                cx="64"
+                                                cy="64"
+                                                r="56"
+                                                stroke="#161B22"
+                                                strokeWidth="12"
+                                                fill="none"
+                                            />
+                                            <circle
+                                                cx="64"
+                                                cy="64"
+                                                r="56"
+                                                stroke="#C7F000"
+                                                strokeWidth="12"
+                                                fill="none"
+                                                strokeDasharray={`${2 * Math.PI * 56}`}
+                                                strokeDashoffset={`${2 * Math.PI * 56 * (1 - stepsProgress / 100)}`}
+                                                strokeLinecap="round"
+                                                className="transition-all duration-500"
+                                            />
+                                        </svg>
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="text-center">
+                                                <div className="text-xl font-semibold text-[#E6EAF0]">{stepsKm}km</div>
                                             </div>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-[#9AA3B2]">Goal</span>
+                                    <span className="text-xl font-semibold text-[#E6EAF0]">10km</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
 
-                        <Link href="/meals">
-                            <Button variant="outline" className="w-full mt-4">
-                                View Full Nutrition
-                            </Button>
-                        </Link>
-                    </div>
+                    {/* Water Card - Middle */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="lg:col-span-4"
+                    >
+                        <Card className="h-full relative overflow-hidden">
+                            <CardHeader>
+                                <CardTitle className="text-[#E6EAF0]">Water</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="relative h-32 mb-4">
+                                    {/* Water visualization */}
+                                    <div className="absolute bottom-0 left-0 right-0 h-full flex items-end">
+                                        <div
+                                            className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all duration-500"
+                                            style={{ height: `${(waterIntake / waterTarget) * 100}%` }}
+                                        />
+                                    </div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="text-2xl font-semibold text-[#E6EAF0]">{waterIntake}L</span>
+                                    </div>
+                                </div>
+                                <button
+                                    className="absolute bottom-4 right-4 size-12 rounded-full bg-[#C7F000] text-[#0B0F14] flex items-center justify-center shadow-[0_0_20px_rgba(199,240,0,0.35)] hover:shadow-[0_0_30px_rgba(199,240,0,0.35)] hover:scale-105 transition-all"
+                                >
+                                    <PlusIcon size={20} />
+                                </button>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+
+                    {/* Daily Goals Card - Right Column, Top */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="lg:col-span-6"
+                    >
+                        <Card className="h-full">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-[#E6EAF0]">Daily goals</CardTitle>
+                                    <button className="size-8 rounded-full bg-[#161B22] flex items-center justify-center text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#1B212B] transition-all">
+                                        <PencilIcon size={16} />
+                                    </button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    {dailyGoals.map((goal) => (
+                                        <div key={goal.id} className="flex items-center gap-3">
+                                            <div className={cn(
+                                                "size-6 rounded-full flex items-center justify-center text-xs",
+                                                goal.completed
+                                                    ? "bg-[#C7F000] text-[#0B0F14]"
+                                                    : "bg-[#6B7280] text-[#9AA3B2]"
+                                            )}>
+                                                {goal.completed && <CheckIcon size={14} />}
+                                            </div>
+                                            <span className="text-sm text-[#9AA3B2]">{goal.icon}</span>
+                                            <span className={cn(
+                                                "text-sm flex-1",
+                                                goal.completed ? "text-[#E6EAF0]" : "text-[#9AA3B2]"
+                                            )}>
+                                                {goal.label}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+
+                    {/* Daily Meals Card */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="lg:col-span-6"
+                    >
+                        <Card className="h-full">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="flex items-center gap-3 text-xl text-[#E6EAF0]">
+                                        <div className="p-2 bg-[#161B22] rounded-xl">
+                                            <AppleIcon className="h-5 w-5 text-[#C7F000]" />
+                                        </div>
+                                        Daily Meals
+                                    </CardTitle>
+                                    <Link href="/meals">
+                                        <button className="size-8 rounded-full bg-[#161B22] flex items-center justify-center text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#1B212B] transition-all">
+                                            <ArrowUpRightIcon size={16} />
+                                        </button>
+                                    </Link>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    {/* Calories Progress */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm text-[#9AA3B2]">Calories</span>
+                                            <span className="text-lg font-semibold text-[#E6EAF0]">
+                                                {totalCalories} / {targetCalories || 2000}
+                                            </span>
+                                        </div>
+                                        <div className="w-full h-2 bg-[#161B22] rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-[#C7F000] rounded-full transition-all duration-500"
+                                                style={{ width: `${Math.min(100, ((totalCalories / (targetCalories || 2000)) * 100))}%` }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Planned Meals */}
+                                    {plannedMeals.length > 0 && (
+                                        <div className="space-y-2">
+                                            <h3 className="text-sm font-semibold text-[#E6EAF0]">Planned Meals</h3>
+                                            {plannedMeals.map((meal, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className="flex items-center justify-between p-3 rounded-xl bg-[#1B212B]"
+                                                >
+                                                    <div>
+                                                        <div className="text-sm font-medium text-[#E6EAF0] capitalize">{meal.mealType}</div>
+                                                        <div className="text-xs text-[#9AA3B2]">{meal.name} • {meal.calories} cal</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Logged Meals */}
+                                    {todayMealLogs && todayMealLogs.length > 0 && (
+                                        <div className="space-y-2">
+                                            <h3 className="text-sm font-semibold text-[#E6EAF0]">Logged Meals</h3>
+                                            {todayMealLogs.map((log) => (
+                                                <div
+                                                    key={log._id}
+                                                    className="flex items-center justify-between p-3 rounded-xl bg-[#1B212B]"
+                                                >
+                                                    <div>
+                                                        <div className="text-sm font-medium text-[#E6EAF0]">{log.name}</div>
+                                                        <div className="text-xs text-[#9AA3B2]">
+                                                            {log.calories} cal{log.protein ? ` • ${log.protein}g protein` : ""}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Quick Add Meal */}
+                                    <div className="pt-2 border-t border-[#1B212B]">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Meal name"
+                                                value={newMealLog.name}
+                                                onChange={(e) => setNewMealLog({ ...newMealLog, name: e.target.value })}
+                                                className="flex-1 px-3 py-2 bg-[#161B22] text-[#E6EAF0] placeholder:text-[#6B7280] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C7F000]/20 transition-all"
+                                            />
+                                            <input
+                                                type="number"
+                                                placeholder="Cal"
+                                                value={newMealLog.calories}
+                                                onChange={(e) => setNewMealLog({ ...newMealLog, calories: e.target.value })}
+                                                className="w-20 px-3 py-2 bg-[#161B22] text-[#E6EAF0] placeholder:text-[#6B7280] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C7F000]/20 transition-all"
+                                            />
+                                            <Button
+                                                onClick={handleAddMealLog}
+                                                size="sm"
+                                                className="rounded-full"
+                                            >
+                                                <PlusIcon className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+
+                    {/* Chat Card - Under Meals */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.55 }}
+                        className="lg:col-span-6"
+                    >
+                        <Card className="flex flex-col" style={{ maxHeight: "550px" }}>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-3 text-xl text-[#E6EAF0]">
+                                    <div className="p-2 bg-[#161B22] rounded-xl">
+                                        <MessageSquareIcon className="h-5 w-5 text-[#C7F000]" />
+                                    </div>
+                                    Chat with Coach
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex flex-col min-h-0" style={{ maxHeight: "470px" }}>
+                                {/* Messages */}
+                                <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2" style={{ maxHeight: "390px" }}>
+                                    {chatMessages.map((msg, idx) => (
+                                        <div
+                                            key={idx}
+                                            className={cn(
+                                                "max-w-[85%] rounded-2xl p-3",
+                                                msg.role === "user"
+                                                    ? "bg-[#C7F000]/20 text-[#E6EAF0] ml-auto border border-[#C7F000]/30"
+                                                    : "bg-[#1B212B] text-[#E6EAF0]"
+                                            )}
+                                        >
+                                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                        </div>
+                                    ))}
+                                    {chatLoading && (
+                                        <div className="bg-[#1B212B] rounded-2xl p-3 max-w-[85%]">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex gap-1">
+                                                    <div className="w-2 h-2 bg-[#C7F000] rounded-full animate-pulse" style={{ animationDelay: "0ms" }} />
+                                                    <div className="w-2 h-2 bg-[#C7F000] rounded-full animate-pulse" style={{ animationDelay: "150ms" }} />
+                                                    <div className="w-2 h-2 bg-[#C7F000] rounded-full animate-pulse" style={{ animationDelay: "300ms" }} />
+                                                </div>
+                                                <span className="text-xs text-[#9AA3B2]">Thinking...</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={messagesEndRef} />
+                                </div>
+
+                                {/* Input */}
+                                <div className="flex gap-2 pt-2 border-t border-[#1B212B]">
+                                    <input
+                                        type="text"
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleChatSend()}
+                                        placeholder="Ask me anything..."
+                                        className="flex-1 px-4 py-2 bg-[#1B212B] text-[#E6EAF0] placeholder:text-[#6B7280] rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#C7F000]/20 transition-all"
+                                        disabled={chatLoading}
+                                    />
+                                    <Button
+                                        onClick={handleChatSend}
+                                        disabled={chatLoading || !chatInput.trim()}
+                                        size="sm"
+                                        className="rounded-full"
+                                    >
+                                        <SendIcon className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+
+                    {/* Today's Workout Card - Large Primary */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.6 }}
+                        className="lg:col-span-6"
+                    >
+                        <Card className="h-full">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="flex items-center gap-3 text-2xl text-[#E6EAF0]">
+                                        <div className="p-2 bg-[#161B22] rounded-xl">
+                                            <DumbbellIcon className="h-6 w-6 text-[#C7F000]" />
+                                        </div>
+                                        Today's Workout
+                                    </CardTitle>
+                                    {!todayWorkout && (
+                                        <Button onClick={handleGenerateToday} size="sm">
+                                            Generate Today
+                                        </Button>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                {todayWorkout ? (
+                                    <div className="space-y-4">
+                                        {todayWorkout.exercises
+                                            .filter((e: any, idx: number, arr: any[]) => 
+                                                arr.findIndex((x: any) => x.exercise?._id === e.exercise?._id) === idx
+                                            )
+                                            .map((exerciseSet: any, idx: number) => {
+                                                const exercise = exerciseSet.exercise;
+                                                const setsForExercise = todayWorkout.exercises.filter(
+                                                    (e: any) => e.exercise?._id === exercise?._id
+                                                );
+                                                const allCompleted = setsForExercise.every((s: any) => s.completed);
+                                                const isCollapsed = collapsedExercises.has(idx);
+                                                const toggleCollapse = () => {
+                                                    const newCollapsed = new Set(collapsedExercises);
+                                                    if (isCollapsed) {
+                                                        newCollapsed.delete(idx);
+                                                    } else {
+                                                        newCollapsed.add(idx);
+                                                    }
+                                                    setCollapsedExercises(newCollapsed);
+                                                };
+
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        className={cn(
+                                                            "rounded-xl p-5 transition-all duration-200",
+                                                            allCompleted 
+                                                                ? "bg-[#C7F000]/10 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.7)]" 
+                                                                : "bg-[#1B212B] shadow-[0_20px_40px_-20px_rgba(0,0,0,0.7)] hover:shadow-[0_25px_50px_-20px_rgba(0,0,0,0.8)] hover:-translate-y-0.5"
+                                                        )}
+                                                    >
+                                                        <div className="font-semibold mb-3 flex items-center justify-between">
+                                                            <div className="flex items-center gap-2 flex-1">
+                                                                <button
+                                                                    onClick={toggleCollapse}
+                                                                    className="p-1 rounded hover:bg-[#161B22] transition-colors"
+                                                                    aria-label={isCollapsed ? "Expand exercise" : "Collapse exercise"}
+                                                                >
+                                                                    {isCollapsed ? (
+                                                                        <ChevronDownIcon className="h-4 w-4 text-[#9AA3B2]" />
+                                                                    ) : (
+                                                                        <ChevronUpIcon className="h-4 w-4 text-[#9AA3B2]" />
+                                                                    )}
+                                                                </button>
+                                                                <span className="text-base text-[#E6EAF0]">{exercise?.name || "Unknown"}</span>
+                                                            </div>
+                                                            {allCompleted && (
+                                                                <CheckIcon className="h-5 w-5 text-[#C7F000]" />
+                                                            )}
+                                                        </div>
+                                                        {!isCollapsed && (
+                                                            <div className="space-y-2.5 text-sm">
+                                                                {setsForExercise.map((set: any, setIdx: number) => (
+                                                                    <div
+                                                                        key={setIdx}
+                                                                        className={cn(
+                                                                            "flex items-center justify-between py-2",
+                                                                            set.completed ? "text-[#C7F000]" : "text-[#9AA3B2]"
+                                                                        )}
+                                                                    >
+                                                                        <span>
+                                                                            Set {set.setNumber}: {set.actualWeight || set.plannedWeight} lbs × {set.actualReps || set.plannedReps} reps
+                                                                        </span>
+                                                                        {!set.completed && (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                onClick={async () => {
+                                                                                    try {
+                                                                                        await updateExerciseSet({
+                                                                                            setId: set._id,
+                                                                                            actualWeight: set.plannedWeight,
+                                                                                            actualReps: set.plannedReps,
+                                                                                            completed: true,
+                                                                                        });
+                                                                                    } catch (error) {
+                                                                                        alert("Failed to complete set");
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                Complete
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        <Link href="/workouts">
+                                            <Button variant="outline" className="w-full mt-6">
+                                                View Full Workout
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-16 text-[#9AA3B2]">
+                                        <p className="mb-2 text-base">No workout scheduled for today.</p>
+                                        <p className="text-sm">Rest day or generate a workout above.</p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </motion.div>
                 </div>
             </div>
-        </section>
+        </div>
     );
 };
 

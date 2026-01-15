@@ -5,9 +5,12 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import CornerElements from "@/components/CornerElements";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Page } from "@/components/layout/Page";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { TrendingUpIcon, TargetIcon, CalendarIcon, ActivityIcon } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 const ProgressPage = () => {
     const { user } = useUser();
@@ -114,56 +117,56 @@ const ProgressPage = () => {
 
     if (!convexUser) {
         return (
-            <section className="relative z-10 pt-12 pb-32 flex-grow container mx-auto px-4">
-                <div className="text-center text-muted-foreground">Loading...</div>
-            </section>
+            <Page>
+                <div className="flex items-center justify-center py-12">
+                    <div className="text-center text-muted-foreground">Loading...</div>
+                </div>
+            </Page>
         );
     }
 
     if (!activePlan) {
         return (
-            <section className="relative z-10 pt-12 pb-32 flex-grow container mx-auto px-4">
-                <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                    <CornerElements />
-                    <div className="text-center">
-                        <h2 className="text-xl font-bold mb-4">No Active Plan</h2>
-                        <p className="text-muted-foreground mb-4">Create a plan to track progress.</p>
-                        <Button asChild>
-                            <Link href="/generate-program">Create Plan</Link>
-                        </Button>
-                    </div>
-                </div>
-            </section>
+            <Page>
+                <Card className="max-w-2xl mx-auto">
+                    <CardContent className="pt-6">
+                        <div className="text-center space-y-4">
+                            <h2 className="text-2xl font-semibold">No Active Plan</h2>
+                            <p className="text-muted-foreground">Create a plan to track progress.</p>
+                            <Button asChild className="mt-4">
+                                <Link href="/generate-program">Create Plan</Link>
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </Page>
         );
     }
 
     return (
-        <section className="relative z-10 pt-12 pb-32 flex-grow container mx-auto px-4">
-            <div className="max-w-6xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                    <CornerElements />
-                    <h1 className="text-2xl font-bold mb-2">
-                        <span className="text-primary">Progress</span> Tracking
-                    </h1>
-                    <p className="text-muted-foreground">Monitor your strength gains and goal progress</p>
-                </div>
+        <Page>
+            <div className="max-w-6xl mx-auto space-y-8">
+                <PageHeader
+                    title="Progress Tracking"
+                    description="Monitor your strength gains and goal progress"
+                />
 
                 {/* Goal Progress */}
                 {goalProgress && (
-                    <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                        <CornerElements />
-                        <div className="flex items-center gap-2 mb-4">
-                            <TargetIcon className="h-5 w-5 text-primary" />
-                            <h2 className="text-xl font-semibold">Goal Progress</h2>
-                        </div>
-                        <div className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <TargetIcon className="h-5 w-5 text-primary" />
+                                Goal Progress
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
                             <div>
-                                <div className="text-sm text-muted-foreground mb-1">Goal</div>
+                                <div className="text-sm font-medium text-muted-foreground mb-1">Goal</div>
                                 <div className="font-semibold text-lg">{goalProgress.goal}</div>
                             </div>
                             <div>
-                                <div className="text-sm text-muted-foreground mb-1">Primary Focus</div>
+                                <div className="text-sm font-medium text-muted-foreground mb-1">Primary Focus</div>
                                 <div className="font-medium">{goalProgress.primaryFocus}</div>
                             </div>
                             <div>
@@ -173,83 +176,88 @@ const ProgressPage = () => {
                                         {goalProgress.weeksElapsed} / {goalProgress.totalWeeks} weeks
                                     </span>
                                 </div>
-                                <div className="w-full bg-background rounded-full h-4">
+                                <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
                                     <div
-                                        className="bg-primary h-4 rounded-full transition-all"
+                                        className="bg-primary h-full rounded-full transition-all duration-300"
                                         style={{ width: `${goalProgress.progressPercent}%` }}
                                     />
                                 </div>
                                 {goalProgress.weeksRemaining > 0 && (
-                                    <div className="text-xs text-muted-foreground mt-1">
+                                    <div className="text-xs text-muted-foreground mt-1.5">
                                         {goalProgress.weeksRemaining} weeks remaining
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {/* Body Part Strength Visualization */}
                 {bodyPartStrength && bodyPartStrength.length > 0 && (
-                    <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                        <CornerElements />
-                        <div className="flex items-center gap-2 mb-4">
-                            <ActivityIcon className="h-5 w-5 text-primary" />
-                            <h2 className="text-xl font-semibold">Body Part Strength</h2>
-                        </div>
-                        <div className="space-y-3">
-                            {bodyPartStrength.map((bp) => {
-                                const strengthPercent = (bp.totalVolume / maxBodyPartVolume) * 100;
-                                return (
-                                    <div key={bp.bodyPart}>
-                                        <div className="flex items-center justify-between text-sm mb-1">
-                                            <span className="font-medium capitalize">{bp.bodyPart}</span>
-                                            <span className="text-muted-foreground">
-                                                {bp.sessions} sessions • {bp.exerciseCount} exercises
-                                            </span>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <ActivityIcon className="h-5 w-5 text-primary" />
+                                Body Part Strength
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {bodyPartStrength.map((bp) => {
+                                    const strengthPercent = (bp.totalVolume / maxBodyPartVolume) * 100;
+                                    return (
+                                        <div key={bp.bodyPart}>
+                                            <div className="flex items-center justify-between text-sm mb-2">
+                                                <span className="font-medium capitalize">{bp.bodyPart}</span>
+                                                <span className="text-muted-foreground text-xs">
+                                                    {bp.sessions} sessions • {bp.exerciseCount} exercises
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                                                <div
+                                                    className="bg-primary h-full rounded-full transition-all duration-300"
+                                                    style={{ width: `${strengthPercent}%` }}
+                                                />
+                                            </div>
+                                            <div className="text-xs text-muted-foreground mt-1.5">
+                                                {Math.round(bp.totalVolume).toLocaleString()} lbs total volume
+                                            </div>
                                         </div>
-                                        <div className="w-full bg-background rounded-full h-3">
-                                            <div
-                                                className="bg-primary h-3 rounded-full"
-                                                style={{ width: `${strengthPercent}%` }}
-                                            />
-                                        </div>
-                                        <div className="text-xs text-muted-foreground mt-1">
-                                            {Math.round(bp.totalVolume).toLocaleString()} lbs total volume
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                                    );
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {/* Exercise Progress Charts */}
-                <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                    <CornerElements />
-                    <div className="flex items-center gap-2 mb-4">
-                        <TrendingUpIcon className="h-5 w-5 text-primary" />
-                        <h2 className="text-xl font-semibold">Exercise Progress</h2>
-                    </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <TrendingUpIcon className="h-5 w-5 text-primary" />
+                            Exercise Progress
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
 
-                    {/* Exercise Selector */}
-                    {topExercises.length > 0 && (
-                        <div className="mb-6">
-                            <div className="text-sm text-muted-foreground mb-2">Select an exercise to view progress:</div>
-                            <div className="flex flex-wrap gap-2">
-                                {topExercises.map((ex) => (
-                                    <Button
-                                        key={ex.exercise._id}
-                                        variant={selectedExerciseId === ex.exercise._id ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setSelectedExerciseId(ex.exercise._id)}
-                                    >
-                                        {ex.exercise.name}
-                                    </Button>
-                                ))}
+                        {/* Exercise Selector */}
+                        {topExercises.length > 0 && (
+                            <div className="mb-6">
+                                <div className="text-sm font-medium text-muted-foreground mb-3">Select an exercise to view progress:</div>
+                                <div className="flex flex-wrap gap-2">
+                                    {topExercises.map((ex) => (
+                                        <Button
+                                            key={ex.exercise._id}
+                                            variant={selectedExerciseId === ex.exercise._id ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() => setSelectedExerciseId(ex.exercise._id)}
+                                        >
+                                            {ex.exercise.name}
+                                        </Button>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
                     {/* Selected Exercise Chart */}
                     {selectedExerciseProgress && selectedExerciseProgress.length > 0 && (
@@ -261,7 +269,7 @@ const ProgressPage = () => {
                                 <div className="space-y-4">
                                     {/* Weight Progress Chart */}
                                     <div>
-                                        <div className="text-sm text-muted-foreground mb-2">Max Weight Over Time</div>
+                                        <div className="text-sm font-medium text-muted-foreground mb-3">Max Weight Over Time</div>
                                         <div className="flex items-end gap-2 h-48">
                                             {selectedExerciseProgress.map((point, idx) => {
                                                 const maxWeight = Math.max(...selectedExerciseProgress.map((p) => p.maxWeight));
@@ -286,7 +294,7 @@ const ProgressPage = () => {
 
                                     {/* Volume Progress */}
                                     <div>
-                                        <div className="text-sm text-muted-foreground mb-2">Total Volume Per Session</div>
+                                        <div className="text-sm font-medium text-muted-foreground mb-3">Total Volume Per Session</div>
                                         <div className="space-y-2">
                                             {selectedExerciseProgress.map((point, idx) => {
                                                 const maxVolume = Math.max(...selectedExerciseProgress.map((p) => p.totalVolume));
@@ -296,13 +304,13 @@ const ProgressPage = () => {
                                                         <div className="w-24 text-xs text-muted-foreground">
                                                             {new Date(point.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                                                         </div>
-                                                        <div className="flex-1 bg-background rounded-full h-4">
+                                                        <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden">
                                                             <div
-                                                                className="bg-primary h-4 rounded-full"
+                                                                className="bg-primary h-full rounded-full transition-all duration-300"
                                                                 style={{ width: `${volumePercent}%` }}
                                                             />
                                                         </div>
-                                                        <div className="w-20 text-xs text-right">
+                                                        <div className="w-20 text-xs text-right font-medium">
                                                             {Math.round(point.totalVolume)} lbs
                                                         </div>
                                                     </div>
@@ -315,74 +323,82 @@ const ProgressPage = () => {
 
                             {/* Future Projection */}
                             {goalProjection && (
-                                <div className="border border-border rounded p-4 bg-background/50">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <CalendarIcon className="h-4 w-4 text-primary" />
-                                        <h4 className="font-semibold">Future Projection</h4>
-                                    </div>
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Current Weight:</span>
-                                            <span className="font-semibold">{goalProjection.currentWeight} lbs</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Projected (4 weeks):</span>
-                                            <span className="font-semibold text-primary">{goalProjection.projectedWeight} lbs</span>
-                                        </div>
-                                        {goalProjection.weeklyGain > 0 && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <CalendarIcon className="h-4 w-4 text-primary" />
+                                            Future Projection
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-2 text-sm">
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Weekly Gain:</span>
-                                                <span className="font-semibold text-green-500">+{goalProjection.weeklyGain} lbs/week</span>
+                                                <span className="text-muted-foreground">Current Weight:</span>
+                                                <span className="font-semibold">{goalProjection.currentWeight} lbs</span>
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Projected (4 weeks):</span>
+                                                <span className="font-semibold text-primary">{goalProjection.projectedWeight} lbs</span>
+                                            </div>
+                                            {goalProjection.weeklyGain > 0 && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">Weekly Gain:</span>
+                                                    <span className="font-semibold text-green-600 dark:text-green-400">+{goalProjection.weeklyGain} lbs/week</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             )}
                         </div>
                     )}
 
                     {selectedExerciseId && (!selectedExerciseProgress || selectedExerciseProgress.length === 0) && (
-                        <div className="text-center text-muted-foreground py-8">
+                        <div className="text-center text-muted-foreground py-12">
                             No completed sets found for this exercise yet.
                         </div>
                     )}
 
                     {!selectedExerciseId && topExercises.length > 0 && (
-                        <div className="text-center text-muted-foreground py-8">
+                        <div className="text-center text-muted-foreground py-12">
                             Select an exercise above to view detailed progress.
                         </div>
                     )}
 
                     {topExercises.length === 0 && (
-                        <div className="text-center text-muted-foreground py-8">
+                        <div className="text-center text-muted-foreground py-12">
                             Complete some workouts to see your progress here.
                         </div>
                     )}
-                </div>
+                    </CardContent>
+                </Card>
 
                 {/* Top Exercises Summary */}
                 {topExercises.length > 0 && (
-                    <div className="relative backdrop-blur-sm border border-border p-6 rounded-lg">
-                        <CornerElements />
-                        <h2 className="text-xl font-semibold mb-4">Top Exercises</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {topExercises.slice(0, 6).map((ex) => (
-                                <div
-                                    key={ex.exercise._id}
-                                    className="border border-border rounded p-3 bg-background/50 cursor-pointer hover:border-primary/50 transition-colors"
-                                    onClick={() => setSelectedExerciseId(ex.exercise._id)}
-                                >
-                                    <div className="font-semibold">{ex.exercise.name}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                        Latest: {ex.latestWeight} lbs • {ex.totalSessions} sessions
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Top Exercises</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {topExercises.slice(0, 6).map((ex) => (
+                                    <div
+                                        key={ex.exercise._id}
+                                        className="rounded-lg border border-border p-3 bg-card cursor-pointer hover:border-primary/50 hover:bg-accent/50 transition-colors"
+                                        onClick={() => setSelectedExerciseId(ex.exercise._id)}
+                                    >
+                                        <div className="font-semibold text-sm">{ex.exercise.name}</div>
+                                        <div className="text-xs text-muted-foreground mt-1">
+                                            Latest: {ex.latestWeight} lbs • {ex.totalSessions} sessions
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
                 )}
             </div>
-        </section>
+        </Page>
     );
 };
 

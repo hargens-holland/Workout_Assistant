@@ -1,10 +1,11 @@
 "use client";
 
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
-import { DumbbellIcon, HomeIcon, UserIcon, ZapIcon, CalendarIcon, MessageSquareIcon, AppleIcon, TrendingUpIcon } from "lucide-react";
+import { ZapIcon, SettingsIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 const Navbar = () => {
     const { isSignedIn } = useUser();
@@ -13,113 +14,105 @@ const Navbar = () => {
     const isActive = (path: string) => pathname === path;
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-md border-b border-border py-3">
-            <div className="container mx-auto flex items-center justify-between">
-                {/* LOGO */}
-                <Link href="/" className="flex items-center gap-2">
-                    <div className="p-1 bg-primary/10 rounded">
-                        <ZapIcon className="w-4 h-4 text-primary" />
-                    </div>
-                    <span className="text-xl font-bold font-mono">
-                        code<span className="text-primary">flex</span>.ai
-                    </span>
-                </Link>
+        <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0F14]">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="flex h-16 items-center justify-between">
+                    {/* LOGO */}
+                    <Link href="/" className="flex items-center gap-2.5 group">
+                        <div className="p-1.5 bg-[#161B22] rounded-xl group-hover:bg-[#1B212B] transition-all duration-200">
+                            <ZapIcon className="w-4 h-4 text-[#C7F000]" />
+                        </div>
+                        <span className="text-lg font-semibold tracking-tight text-[#E6EAF0]">
+                            FitSpark
+                        </span>
+                    </Link>
 
-                {/* NAVIGATION */}
-                <nav className="flex items-center gap-5">
-                    {isSignedIn ? (
-                        <>
-                            <Link
-                                href="/home"
-                                className={`flex items-center gap-1.5 text-sm transition-colors ${
-                                    isActive("/home") ? "text-primary font-semibold" : "hover:text-primary"
-                                }`}
-                            >
-                                <HomeIcon size={16} />
-                                <span>Home</span>
-                            </Link>
-
-                            <Link
-                                href="/workouts"
-                                className={`flex items-center gap-1.5 text-sm transition-colors ${
-                                    isActive("/workouts") ? "text-primary font-semibold" : "hover:text-primary"
-                                }`}
-                            >
-                                <DumbbellIcon size={16} />
-                                <span>Workouts</span>
-                            </Link>
-
-                            <Link
-                                href="/progress"
-                                className={`flex items-center gap-1.5 text-sm transition-colors ${
-                                    isActive("/progress") ? "text-primary font-semibold" : "hover:text-primary"
-                                }`}
-                            >
-                                <TrendingUpIcon size={16} />
-                                <span>Progress</span>
-                            </Link>
-
-                            <Link
-                                href="/meals"
-                                className={`flex items-center gap-1.5 text-sm transition-colors ${
-                                    isActive("/meals") ? "text-primary font-semibold" : "hover:text-primary"
-                                }`}
-                            >
-                                <AppleIcon size={16} />
-                                <span>Meals</span>
-                            </Link>
-
-                            <Link
-                                href="/calendar"
-                                className={`flex items-center gap-1.5 text-sm transition-colors ${
-                                    isActive("/calendar") ? "text-primary font-semibold" : "hover:text-primary"
-                                }`}
-                            >
-                                <CalendarIcon size={16} />
-                                <span>Calendar</span>
-                            </Link>
-
-                            <Link
-                                href="/chat"
-                                className={`flex items-center gap-1.5 text-sm transition-colors ${
-                                    isActive("/chat") ? "text-primary font-semibold" : "hover:text-primary"
-                                }`}
-                            >
-                                <MessageSquareIcon size={16} />
-                                <span>Chat</span>
-                            </Link>
-
-                            <Link
-                                href="/profile"
-                                className={`flex items-center gap-1.5 text-sm transition-colors ${
-                                    isActive("/profile") ? "text-primary font-semibold" : "hover:text-primary"
-                                }`}
-                            >
-                                <UserIcon size={16} />
-                                <span>Profile</span>
-                            </Link>
-
-                            <UserButton />
-                        </>
-                    ) : (
-                        <>
-                            <SignInButton>
-                                <Button
-                                    variant={"outline"}
-                                    className="border-primary/50 text-primary hover:text-white hover:bg-primary/10"
+                    {/* NAVIGATION */}
+                    <nav className="flex items-center gap-1">
+                        {isSignedIn ? (
+                            <>
+                                <Link
+                                    href="/home"
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
+                                        isActive("/home")
+                                            ? "bg-[#C7F000]/20 text-[#C7F000]"
+                                            : "text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#161B22]/50"
+                                    )}
                                 >
-                                    Sign In
-                                </Button>
-                            </SignInButton>
+                                    <span>Dashboard</span>
+                                </Link>
 
-                            <SignUpButton>
-                                <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-                                    Sign Up
-                                </Button>
-                            </SignUpButton>
-                        </>
-                    )}
-                </nav>
+                                <Link
+                                    href="/workouts"
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
+                                        isActive("/workouts")
+                                            ? "bg-[#C7F000]/20 text-[#C7F000]"
+                                            : "text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#161B22]/50"
+                                    )}
+                                >
+                                    <span>Workouts</span>
+                                </Link>
+
+                                <Link
+                                    href="/meals"
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
+                                        isActive("/meals")
+                                            ? "bg-[#C7F000]/20 text-[#C7F000]"
+                                            : "text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#161B22]/50"
+                                    )}
+                                >
+                                    <span>Nutrition</span>
+                                </Link>
+
+                                <Link
+                                    href="/progress"
+                                    className={cn(
+                                        "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
+                                        isActive("/progress")
+                                            ? "bg-[#C7F000]/20 text-[#C7F000]"
+                                            : "text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#161B22]/50"
+                                    )}
+                                >
+                                    <span>Progress</span>
+                                </Link>
+
+                                {/* Icons */}
+                                <div className="ml-4 flex items-center gap-2">
+                                    <Link
+                                        href="/profile"
+                                        className={cn(
+                                            "size-8 rounded-full bg-[#161B22] flex items-center justify-center text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#1B212B] transition-all",
+                                            isActive("/profile") && "bg-[#C7F000]/20 text-[#C7F000]"
+                                        )}
+                                        title="Settings"
+                                    >
+                                        <SettingsIcon size={16} />
+                                    </Link>
+                                    <div className="size-8 rounded-full bg-[#161B22] flex items-center justify-center overflow-hidden">
+                                        <UserButton />
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <SignInButton>
+                                    <Button variant="ghost" className="text-[#9AA3B2] hover:text-[#E6EAF0] rounded-xl">
+                                        Sign In
+                                    </Button>
+                                </SignInButton>
+
+                                <SignUpButton>
+                                    <Button className="rounded-full">
+                                        Sign Up
+                                    </Button>
+                                </SignUpButton>
+                            </>
+                        )}
+                    </nav>
+                </div>
             </div>
         </header>
     );
