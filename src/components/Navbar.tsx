@@ -1,7 +1,7 @@
 "use client";
 
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
-import { DumbbellIcon, HomeIcon, UserIcon, ZapIcon, CalendarIcon, MessageSquareIcon, AppleIcon } from "lucide-react";
+import { DumbbellIcon, HomeIcon, UserIcon, ZapIcon, CalendarIcon, MessageSquareIcon, AppleIcon, TrendingUpIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "./ui/button";
 import { usePathname } from "next/navigation";
@@ -47,6 +47,16 @@ const Navbar = () => {
                             >
                                 <DumbbellIcon size={16} />
                                 <span>Workouts</span>
+                            </Link>
+
+                            <Link
+                                href="/progress"
+                                className={`flex items-center gap-1.5 text-sm transition-colors ${
+                                    isActive("/progress") ? "text-primary font-semibold" : "hover:text-primary"
+                                }`}
+                            >
+                                <TrendingUpIcon size={16} />
+                                <span>Progress</span>
                             </Link>
 
                             <Link

@@ -32,10 +32,10 @@ const MealsPage = () => {
         api.plans.getWorkoutsByDateRange,
         convexUser?._id
             ? {
-                  userId: convexUser._id,
-                  startDate: today,
-                  endDate: today,
-              }
+                userId: convexUser._id,
+                startDate: today,
+                endDate: today,
+            }
             : "skip"
     );
 
@@ -50,10 +50,10 @@ const MealsPage = () => {
         api.mealLogs.getMealLogsByDateRange,
         convexUser?._id
             ? {
-                  userId: convexUser._id,
-                  startDate: weekStartStr,
-                  endDate: weekEndStr,
-              }
+                userId: convexUser._id,
+                startDate: weekStartStr,
+                endDate: weekEndStr,
+            }
             : "skip"
     );
 

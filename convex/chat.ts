@@ -2,6 +2,8 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import { z } from "zod";
+import { generateText } from "./llm";
 
 /* =======================
    Intent Types
@@ -35,188 +37,188 @@ export type ChatResponse = {
 };
 
 /* =======================
-   Intent Parser (Deterministic)
+   Intent Schema (Zod)
 ======================= */
 
-function parseIntent(message: string, context: { date: string; activePlanId?: Id<"plans"> }): Intent {
-    const lower = message.toLowerCase().trim();
+const IntentSchema = z.object({
+    intent: z.enum([
+        "CLARIFY",
+        "EDIT_TODAY_WORKOUT",
+        "REGENERATE_TODAY_WORKOUT",
+        "SWAP_EXERCISE",
+        "GENERATE_PLAN",
+        "UPDATE_GOAL",
+        "SWAP_MEAL",
+        "LOG_MEAL",
+        "REQUEST_EXPLANATION",
+        "VIEW_PROGRESS",
+        "SMALL_TALK",
+        "UNKNOWN",
+    ]),
+    confidence: z.number().min(0).max(1),
+    params: z.record(z.string(), z.any()),
+});
 
-    // WORKOUT_SWAP_EXERCISE: "Swap squats for something knee-friendly"
-    if (
-        lower.includes("swap") ||
-        lower.includes("replace") ||
-        lower.includes("change") ||
-        lower.includes("switch")
-    ) {
-        const exerciseMatch = lower.match(/(?:swap|replace|change|switch)\s+(\w+)/);
-        const exercise = exerciseMatch ? exerciseMatch[1] : null;
-        const kneeFriendly = lower.includes("knee") || lower.includes("knee-friendly");
-        const bodyPart = extractBodyPart(lower);
+type LLMIntent = z.infer<typeof IntentSchema>;
 
+/* =======================
+   Intent Parser (LLM-based)
+======================= */
+
+async function parseIntent(
+    message: string,
+    context: { date: string; activePlanId?: Id<"plans"> }
+): Promise<Intent> {
+    const systemPrompt = `You are an intent classifier for a fitness assistant app.
+
+Return JSON only. Do NOT include explanations, markdown, or extra text.
+
+Choose EXACTLY ONE intent from the list below:
+
+- CLARIFY: User's request is ambiguous or unclear
+- EDIT_TODAY_WORKOUT: User wants to modify today's workout (make easier, shorter, etc.)
+- REGENERATE_TODAY_WORKOUT: User wants to completely regenerate today's workout
+- SWAP_EXERCISE: User wants to swap/replace an exercise in a workout
+- GENERATE_PLAN: User wants to generate a new fitness plan
+- UPDATE_GOAL: User wants to update their fitness goals
+- SWAP_MEAL: User wants to swap/replace a meal
+- LOG_MEAL: User wants to log a meal they ate
+- REQUEST_EXPLANATION: User is asking for an explanation about something
+- VIEW_PROGRESS: User wants to see their progress/stats
+- SMALL_TALK: Casual conversation, greetings, etc.
+- UNKNOWN: Intent doesn't match any of the above
+
+Return a JSON object with:
+- intent: one of the intent strings above
+- confidence: number between 0 and 1 (how confident you are in this classification)
+- params: an object with any relevant parameters extracted from the message
+
+Example: {"intent": "SWAP_EXERCISE", "confidence": 0.9, "params": {"exerciseName": "squats", "bodyPart": "legs"}}`;
+
+    try {
+        const llmResponse = await generateText({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: message },
+            ],
+            modelRole: "intent",
+        });
+
+        // [TEST LOG] Raw LLM response
+        console.log("🔍 [INTENT PARSING] User input:", message);
+        console.log("🔍 [INTENT PARSING] Raw LLM response:", llmResponse);
+
+        // Parse JSON from response
+        // Note: responseMimeType is set to "application/json" so markdown stripping is likely unnecessary,
+        // but kept defensively for robustness
+        let jsonText = llmResponse.trim();
+        // Remove markdown code blocks if present (defensive)
+        jsonText = jsonText.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
+
+        const parsed = JSON.parse(jsonText);
+        const validated = IntentSchema.parse(parsed);
+
+        // [TEST LOG] Validated LLM intent
+        console.log("🔍 [INTENT PARSING] Parsed & validated LLM intent:", JSON.stringify(validated, null, 2));
+
+        // Map LLM intent to internal intent type
+        const internalIntent = mapLLMIntentToInternal(validated, context);
+        console.log("🔍 [INTENT PARSING] Mapped to internal intent:", JSON.stringify(internalIntent, null, 2));
+        
+        return internalIntent;
+    } catch (error) {
+        // [TEST LOG] Parsing/validation failure
+        console.error("❌ [INTENT PARSING] Error parsing intent:", error);
+        // If parsing or validation fails, return UNKNOWN with 0 confidence
         return {
-            type: "WORKOUT_SWAP_EXERCISE",
-            params: {
-                exerciseName: exercise,
-                bodyPart,
-                kneeFriendly,
-                date: context.date,
-            },
-            confidence: 0.8,
+            type: "UNKNOWN",
+            params: {},
+            confidence: 0,
         };
     }
+}
 
-    // WORKOUT_MAKE_EASIER: "Make today easier" / "Make it shorter"
-    if (lower.includes("easier") || lower.includes("shorter") || lower.includes("reduce")) {
-        const removeExercise = lower.includes("shorter") || lower.includes("remove exercise");
-        return {
-            type: "WORKOUT_MAKE_EASIER",
-            params: {
-                date: context.date,
-                mode: removeExercise ? "remove_exercise" : "remove_set",
-            },
-            confidence: 0.9,
-        };
-    }
+/* =======================
+   Intent Mapping
+======================= */
 
-    // WORKOUT_ADD_FOCUS: "Add more arms this week" / "more chest"
-    if (lower.includes("add") && (lower.includes("more") || lower.includes("focus"))) {
-        const bodyPart = extractBodyPart(lower);
-        if (bodyPart) {
+function mapLLMIntentToInternal(
+    llmIntent: LLMIntent,
+    context: { date: string; activePlanId?: Id<"plans"> }
+): Intent {
+    // [TEST LOG] Mapping decision
+    console.log("🔄 [INTENT MAPPING] Mapping LLM intent:", llmIntent.intent, "→ internal intent");
+    
+    switch (llmIntent.intent) {
+        case "SWAP_EXERCISE":
             return {
-                type: "WORKOUT_ADD_FOCUS",
+                type: "WORKOUT_SWAP_EXERCISE",
                 params: {
-                    bodyPart,
-                    count: lower.includes("week") ? 2 : 1,
+                    ...llmIntent.params,
+                    date: context.date,
                 },
-                confidence: 0.8,
+                confidence: llmIntent.confidence,
             };
-        }
-    }
 
-    // MEAL_SUGGEST: "What should I eat tonight?" "high protein snacks"
-    if (
-        lower.includes("what should i eat") ||
-        lower.includes("suggest") ||
-        lower.includes("recommend")
-    ) {
-        const mealType = extractMealType(lower);
-        const highProtein = lower.includes("protein") || lower.includes("high protein");
-        return {
-            type: "MEAL_SUGGEST",
-            params: {
-                mealType: mealType || "dinner",
-                highProtein,
-                date: context.date,
-            },
-            confidence: 0.8,
-        };
-    }
-
-    // MEAL_LOG_QUICK: "Log chicken salad 450 calories 40 protein"
-    if (lower.startsWith("log ") || lower.includes("logged")) {
-        const logMatch = lower.match(/log\s+(.+?)(?:\s+(\d+)\s+calories?)?(?:\s+(\d+)\s+protein)?/);
-        if (logMatch) {
-            const name = logMatch[1].trim();
-            const calories = logMatch[2] ? parseInt(logMatch[2]) : null;
-            const protein = logMatch[3] ? parseInt(logMatch[3]) : null;
-
+        case "LOG_MEAL":
             return {
                 type: "MEAL_LOG_QUICK",
                 params: {
-                    name,
-                    calories: calories || 0,
-                    protein: protein || undefined,
+                    ...llmIntent.params,
                     date: context.date,
                 },
-                confidence: 0.9,
+                confidence: llmIntent.confidence,
             };
-        }
-    }
 
-    // SCHEDULE_MOVE_WORKOUT: "Move Friday workout to Saturday"
-    if (lower.includes("move") && (lower.includes("workout") || lower.includes("session"))) {
-        const dayMatch = lower.match(/move\s+(?:.*?)\s+(?:to|on)\s+(\w+)/);
-        const fromDayMatch = lower.match(/move\s+(\w+)/);
-        const toDayMatch = lower.match(/to\s+(\w+)/);
-
-        if (toDayMatch) {
-            const targetDay = toDayMatch[1];
+        case "EDIT_TODAY_WORKOUT":
+            // Map to WORKOUT_MAKE_EASIER for now (existing behavior)
             return {
-                type: "SCHEDULE_MOVE_WORKOUT",
+                type: "WORKOUT_MAKE_EASIER",
                 params: {
-                    fromDate: fromDayMatch ? getDateForDayName(fromDayMatch[1], context.date) : context.date,
-                    toDate: getDateForDayName(targetDay, context.date),
+                    date: context.date,
+                    mode: llmIntent.params.mode || "remove_set",
                 },
-                confidence: 0.7,
+                confidence: llmIntent.confidence,
             };
-        }
+
+        case "REGENERATE_TODAY_WORKOUT":
+            // Map to UNKNOWN for now (no existing handler, will return message)
+            return {
+                type: "UNKNOWN",
+                params: {
+                    originalIntent: "REGENERATE_TODAY_WORKOUT",
+                    ...llmIntent.params,
+                },
+                confidence: llmIntent.confidence,
+            };
+
+        case "CLARIFY":
+        case "SMALL_TALK":
+        case "REQUEST_EXPLANATION":
+        case "VIEW_PROGRESS":
+        case "GENERATE_PLAN":
+        case "UPDATE_GOAL":
+        case "SWAP_MEAL":
+            // Map to UNKNOWN with original intent preserved
+            return {
+                type: "UNKNOWN",
+                params: {
+                    originalIntent: llmIntent.intent,
+                    ...llmIntent.params,
+                },
+                confidence: llmIntent.confidence,
+            };
+
+        case "UNKNOWN":
+        default:
+            return {
+                type: "UNKNOWN",
+                params: llmIntent.params,
+                confidence: llmIntent.confidence,
+            };
     }
-
-    // BLOCK_ITEM: "Never show burpees again" or "block this meal"
-    if (lower.includes("block") || lower.includes("never show") || lower.includes("don't show")) {
-        const itemMatch = lower.match(/(?:block|never show|don't show)\s+(.+?)(?:\s+again)?/);
-        const itemName = itemMatch ? itemMatch[1].trim() : null;
-        const isMeal = lower.includes("meal") || lower.includes("food");
-
-        return {
-            type: "BLOCK_ITEM",
-            params: {
-                itemName,
-                itemType: isMeal ? "meal" : "exercise",
-            },
-            confidence: 0.8,
-        };
-    }
-
-    return {
-        type: "UNKNOWN",
-        params: {},
-        confidence: 0.1,
-    };
 }
 
-function extractBodyPart(text: string): string | null {
-    const bodyParts = [
-        "chest",
-        "back",
-        "legs",
-        "shoulders",
-        "arms",
-        "biceps",
-        "triceps",
-        "core",
-        "abs",
-    ];
-    for (const part of bodyParts) {
-        if (text.includes(part)) {
-            return part;
-        }
-    }
-    return null;
-}
-
-function extractMealType(text: string): string | null {
-    if (text.includes("breakfast")) return "breakfast";
-    if (text.includes("lunch")) return "lunch";
-    if (text.includes("dinner") || text.includes("tonight")) return "dinner";
-    if (text.includes("snack")) return "snack";
-    return null;
-}
-
-function getDateForDayName(dayName: string, referenceDate: string): string {
-    const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-    const dayIndex = days.findIndex((d) => d.startsWith(dayName.toLowerCase()));
-    if (dayIndex === -1) return referenceDate;
-
-    const refDate = new Date(referenceDate);
-    const currentDay = refDate.getDay();
-    let daysToAdd = dayIndex - currentDay;
-    if (daysToAdd <= 0) daysToAdd += 7; // Next occurrence
-
-    const targetDate = new Date(refDate);
-    targetDate.setDate(targetDate.getDate() + daysToAdd);
-    return targetDate.toISOString().split("T")[0];
-}
 
 /* =======================
    Intent Execution
@@ -228,6 +230,10 @@ async function executeIntent(
     context: { userId: Id<"users">; planId?: Id<"plans">; date: string }
 ): Promise<ChatResponse> {
     const dataChanges: ChatResponse["dataChanges"] = [];
+
+    // [TEST LOG] Execution start
+    console.log("⚙️ [EXECUTION] Executing intent:", intent.type, "with confidence:", intent.confidence);
+    console.log("⚙️ [EXECUTION] Intent params:", JSON.stringify(intent.params, null, 2));
 
     try {
         switch (intent.type) {
@@ -513,6 +519,64 @@ async function executeIntent(
 
             case "UNKNOWN":
             default:
+                // Handle new intents that don't have execution handlers yet
+                const originalIntent = intent.params.originalIntent;
+                if (originalIntent === "REGENERATE_TODAY_WORKOUT") {
+                    return {
+                        success: false,
+                        message: "Regenerating today's workout is not yet available. You can modify your workout instead.",
+                        dataChanges: [],
+                    };
+                }
+                if (originalIntent === "GENERATE_PLAN") {
+                    return {
+                        success: false,
+                        message: "You can generate a new plan from the Generate Program page.",
+                        dataChanges: [],
+                    };
+                }
+                if (originalIntent === "UPDATE_GOAL") {
+                    return {
+                        success: false,
+                        message: "You can update your goals from your profile page.",
+                        dataChanges: [],
+                    };
+                }
+                if (originalIntent === "SWAP_MEAL") {
+                    return {
+                        success: false,
+                        message: "You can swap meals from the Meals page.",
+                        dataChanges: [],
+                    };
+                }
+                if (originalIntent === "VIEW_PROGRESS") {
+                    return {
+                        success: false,
+                        message: "You can view your progress on the Progress page.",
+                        dataChanges: [],
+                    };
+                }
+                if (originalIntent === "REQUEST_EXPLANATION") {
+                    return {
+                        success: false,
+                        message: "I'm here to help! What would you like to know more about?",
+                        dataChanges: [],
+                    };
+                }
+                if (originalIntent === "SMALL_TALK") {
+                    return {
+                        success: true,
+                        message: "Hi! I'm your fitness coach. How can I help you today?",
+                        dataChanges: [],
+                    };
+                }
+                if (originalIntent === "CLARIFY") {
+                    return {
+                        success: false,
+                        message: "Can you clarify what you'd like to do?",
+                        dataChanges: [],
+                    };
+                }
                 return {
                     success: false,
                     message: "I didn't understand that. Try: 'swap squats', 'make today easier', 'log chicken salad 450 calories', or 'move Friday workout to Saturday'.",
@@ -550,14 +614,33 @@ export const chatCommand = action({
             date: args.date,
         };
 
-        // Parse intent
-        const intent = parseIntent(args.message, {
+        // Parse intent using LLM
+        const intent = await parseIntent(args.message, {
             date: args.date,
             activePlanId: activePlan?._id,
         });
 
+        // [TEST LOG] Confidence check
+        console.log("🛡️ [CONFIDENCE GATING] Intent confidence:", intent.confidence, "Threshold: 0.7");
+
+        // Confidence gating: if confidence is too low, return clarifying question
+        if (intent.confidence < 0.7) {
+            console.log("🛡️ [CONFIDENCE GATING] ❌ BLOCKED - Confidence too low, returning clarifying question");
+            return {
+                success: false,
+                message: "Can you clarify what you'd like to change?",
+                dataChanges: [],
+            };
+        }
+
+        console.log("🛡️ [CONFIDENCE GATING] ✅ PASSED - Proceeding with execution");
+
         // Execute intent
         const response = await executeIntent(ctx, intent, context);
+
+        // [TEST LOG] Execution result
+        console.log("✅ [EXECUTION RESULT] Success:", response.success, "Message:", response.message);
+        console.log("✅ [EXECUTION RESULT] Data changes:", JSON.stringify(response.dataChanges, null, 2));
 
         return response;
     },

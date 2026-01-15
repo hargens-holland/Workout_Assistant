@@ -1,7 +1,7 @@
 import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "./llm";
 import { Id } from "./_generated/dataModel";
 import { getSplitTemplate, type SplitType } from "./splits";
 
@@ -343,17 +343,6 @@ export const generatePlan = action({
         // split_type is now auto-selected based on workout_days, no longer needed in args
     },
     handler: async (ctx, args) => {
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-        const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash-001",
-            generationConfig: {
-                temperature: 0.4,
-                topP: 0.9,
-                responseMimeType: "application/json",
-            },
-        });
-
         // Auto-select split based on workout days
         function autoSelectSplit(workoutDays: number): SplitType {
             if (workoutDays >= 6) {
@@ -464,8 +453,10 @@ Respond ONLY with valid JSON using this schema:
 
 Do not include any text outside the JSON.`;
 
-        const strategyResult = await model.generateContent(strategyPrompt);
-        const strategyText = strategyResult.response.text();
+        const strategyText = await generateText({
+            messages: [{ role: "user", content: strategyPrompt }],
+            modelRole: "planning",
+        });
         let trainingStrategy;
         try {
             trainingStrategy = JSON.parse(strategyText);
@@ -517,8 +508,10 @@ Return a JSON object with this EXACT structure and no other fields:
 
 DO NOT add any fields that are not in this example. Your response must be a valid JSON object with no additional text.`;
 
-        const dietResult = await model.generateContent(dietPrompt);
-        const dietPlanText = dietResult.response.text();
+        const dietPlanText = await generateText({
+            messages: [{ role: "user", content: dietPrompt }],
+            modelRole: "planning",
+        });
         let dietPlan;
         try {
             dietPlan = JSON.parse(dietPlanText);
@@ -983,7 +976,7 @@ export const generateWorkoutsFromStrategy = action({
             const minutesPerExercise = 10;
             const targetMinutes = 60;
             const maxExercisesByTime = Math.floor(targetMinutes / minutesPerExercise);
-            
+
             // Base count by split type
             let baseCount: number;
             if (splitType === "FULL_BODY") {
@@ -999,7 +992,7 @@ export const generateWorkoutsFromStrategy = action({
             } else {
                 baseCount = bodyParts.length > 2 ? 5 : 4;
             }
-            
+
             // Cap by time constraint
             return Math.min(baseCount, maxExercisesByTime);
         };
@@ -1045,11 +1038,11 @@ export const generateWorkoutsFromStrategy = action({
                         strategy.recovery_notes.toLowerCase().includes("fatigue"));
 
                 // Check if this is a running/cardio session for an endurance goal
-                const isRunningSession = matchingSession.bodyParts.includes("cardio") || 
-                                         matchingSession.bodyParts.includes("running") ||
-                                         (strategy.goal_type === "endurance" && 
-                                          (strategy.training_priorities.some(p => p.toLowerCase().includes("running")) ||
-                                           strategy.training_priorities.some(p => p.toLowerCase().includes("cardio"))));
+                const isRunningSession = matchingSession.bodyParts.includes("cardio") ||
+                    matchingSession.bodyParts.includes("running") ||
+                    (strategy.goal_type === "endurance" &&
+                        (strategy.training_priorities.some(p => p.toLowerCase().includes("running")) ||
+                            strategy.training_priorities.some(p => p.toLowerCase().includes("cardio"))));
 
                 let exerciseIds: Id<"exercises">[] = [];
 
@@ -1113,23 +1106,23 @@ export const generateWorkoutsFromStrategy = action({
                 // Create exercise sets with progression
                 for (let i = 0; i < exerciseIds.length; i++) {
                     const exerciseId = exerciseIds[i];
-                    
+
                     // Check if this is a running exercise
                     const exercise = await ctx.runQuery(api.plans.getExerciseById, { exerciseId });
                     const isRunning = exercise?.name.toLowerCase().includes("running") || exercise?.name.toLowerCase() === "run";
-                    
+
                     if (isRunning) {
                         // For running: use reps to represent distance in miles, weight = 0
                         // Intensity-based distance: heavy = longer/faster, moderate = medium, light = shorter/easy
                         const distanceMiles = matchingSession.intensity === "heavy" ? 4 + (weekNumber * 0.5) :
-                                            matchingSession.intensity === "moderate" ? 3 + (weekNumber * 0.3) :
-                                            2 + (weekNumber * 0.2);
+                            matchingSession.intensity === "moderate" ? 3 + (weekNumber * 0.3) :
+                                2 + (weekNumber * 0.2);
                         const adjustedDistance = isDeloadWeek ? distanceMiles * 0.7 : distanceMiles;
                         const sets = 1; // Running is typically one continuous set
-                        
+
                         // Round to 0.1 mile precision
                         const roundedDistance = Math.round(adjustedDistance * 10) / 10;
-                        
+
                         await ctx.runMutation(api.plans.createExerciseSet, {
                             sessionId,
                             exerciseId,
@@ -1204,11 +1197,11 @@ export const generateWorkoutsFromStrategy = action({
         }
 
         console.log("[generateWorkoutsFromStrategy] Workout generation completed successfully");
-        
+
         // Update plan's workoutPlan.schedule with summary
         const scheduleSummary: string[] = [];
         const splitType = plan.executionConfig?.split_type ?? strategy.split_type;
-        
+
         for (const session of weeklySplit) {
             let sessionName = "";
             if (splitType) {
@@ -1216,23 +1209,23 @@ export const generateWorkoutsFromStrategy = action({
                 const matchingDay = splitTemplate.days.find(d => {
                     const dayBodyParts = new Set(d.bodyParts);
                     const sessionBodyParts = new Set(session.bodyParts);
-                    return dayBodyParts.size === sessionBodyParts.size && 
-                           Array.from(dayBodyParts).every(bp => sessionBodyParts.has(bp));
+                    return dayBodyParts.size === sessionBodyParts.size &&
+                        Array.from(dayBodyParts).every(bp => sessionBodyParts.has(bp));
                 });
                 sessionName = matchingDay?.name || session.bodyParts[0] || "Workout";
             } else {
                 const primaryBodyPart = session.bodyParts[0] || "Workout";
                 sessionName = primaryBodyPart.charAt(0).toUpperCase() + primaryBodyPart.slice(1);
             }
-            
+
             scheduleSummary.push(`${session.dayOfWeek}: ${sessionName}`);
         }
-        
+
         await ctx.runMutation(api.plans.updateWorkoutPlanSchedule, {
             planId: args.planId,
             schedule: scheduleSummary,
         });
-        
+
         return { success: true };
     },
 });
@@ -1363,13 +1356,13 @@ export const selectRandomExercisesForCategory = query({
             const twoWeeksAgo = new Date();
             twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
             const twoWeeksAgoStr = twoWeeksAgo.toISOString().split("T")[0];
-            
+
             const recentSessions = await ctx.db
                 .query("workout_sessions")
                 .withIndex("by_user_id", (q) => q.eq("userId", userId))
                 .filter((q) => q.gte(q.field("date"), twoWeeksAgoStr))
                 .collect();
-            
+
             for (const session of recentSessions) {
                 const sets = await ctx.db
                     .query("exercise_sets")
@@ -1388,11 +1381,11 @@ export const selectRandomExercisesForCategory = query({
         // Weighted random selection
         const selected: Id<"exercises">[] = [];
         const remaining = [...weightedExercises];
-        
+
         while (selected.length < args.count && remaining.length > 0) {
             const totalWeight = remaining.reduce((sum, item) => sum + item.weight, 0);
             let random = Math.random() * totalWeight;
-            
+
             for (let i = 0; i < remaining.length; i++) {
                 random -= remaining[i].weight;
                 if (random <= 0) {
@@ -1481,7 +1474,7 @@ export const calculateProgressionForExercise = query({
                     const rpe = lastSet.actualRPE;
 
                     let increasePercent: number;
-                    
+
                     if (rpe !== undefined) {
                         if (rpe <= 7) {
                             increasePercent = lastReps >= args.targetReps ? 0.05 : 0.04;
@@ -2178,11 +2171,11 @@ export const generateNextWorkout = action({
         };
 
         // Check if this is a running/cardio session for an endurance goal
-        const isRunningSession = nextSession.bodyParts.includes("cardio") || 
-                                 nextSession.bodyParts.includes("running") ||
-                                 (strategy.goal_type === "endurance" && 
-                                  (strategy.training_priorities.some(p => p.toLowerCase().includes("running")) ||
-                                   strategy.training_priorities.some(p => p.toLowerCase().includes("cardio"))));
+        const isRunningSession = nextSession.bodyParts.includes("cardio") ||
+            nextSession.bodyParts.includes("running") ||
+            (strategy.goal_type === "endurance" &&
+                (strategy.training_priorities.some(p => p.toLowerCase().includes("running")) ||
+                    strategy.training_priorities.some(p => p.toLowerCase().includes("cardio"))));
 
         let exerciseIds: Id<"exercises">[] = [];
 
@@ -2208,7 +2201,7 @@ export const generateNextWorkout = action({
 
         // Create workout session
         const weekNumber = Math.ceil((nextDate.getTime() - new Date(completedSession.date).getTime()) / (7 * 24 * 60 * 60 * 1000)) + completedSession.weekNumber;
-        
+
         // Check for fatigue-based deload
         const fatigueCheck = await ctx.runQuery(api.plans.checkFatigueIndicators, {
             userId: args.userId,
@@ -2231,22 +2224,22 @@ export const generateNextWorkout = action({
         // Create exercise sets
         for (let i = 0; i < exerciseIds.length; i++) {
             const exerciseId = exerciseIds[i];
-            
+
             // Check if this is a running exercise
             const exercise = await ctx.runQuery(api.plans.getExerciseById, { exerciseId });
             const isRunning = exercise?.name.toLowerCase().includes("running") || exercise?.name.toLowerCase() === "run";
-            
+
             if (isRunning) {
                 // For running: use reps to represent distance in miles, weight = 0
                 // Intensity-based distance: heavy = longer/faster, moderate = medium, light = shorter/easy
                 const distanceMiles = nextSession.intensity === "heavy" ? 4 + (weekNumber * 0.5) :
-                                    nextSession.intensity === "moderate" ? 3 + (weekNumber * 0.3) :
-                                    2 + (weekNumber * 0.2);
+                    nextSession.intensity === "moderate" ? 3 + (weekNumber * 0.3) :
+                        2 + (weekNumber * 0.2);
                 const adjustedDistance = isDeloadWeek ? distanceMiles * 0.7 : distanceMiles;
-                
+
                 // Round to 0.1 mile precision
                 const roundedDistance = Math.round(adjustedDistance * 10) / 10;
-                
+
                 await ctx.runMutation(api.plans.createExerciseSet, {
                     sessionId,
                     exerciseId,
@@ -2534,7 +2527,7 @@ export const regenerateExercise = action({
         }
 
         const strategy = plan.trainingStrategy as TrainingStrategy;
-        
+
         // Check for fatigue-based deload
         const fatigueCheck = await ctx.runQuery(api.plans.checkFatigueIndicators, {
             userId: args.userId,
@@ -2720,17 +2713,17 @@ export const getOrCreateRunningExercise = action({
     handler: async (ctx): Promise<Id<"exercises">> => {
         // Try to find existing Running exercise (case-insensitive)
         const exercises = await ctx.runQuery(api.plans.getAllExercises, {});
-        
-        const runningExercise = exercises.find((e: any) => 
-            e.name.toLowerCase() === "running" || 
+
+        const runningExercise = exercises.find((e: any) =>
+            e.name.toLowerCase() === "running" ||
             e.name.toLowerCase() === "run" ||
             (e.bodyPart?.toLowerCase() === "cardio" && e.name?.toLowerCase().includes("run"))
         );
-        
+
         if (runningExercise) {
             return runningExercise._id;
         }
-        
+
         // If not found, create it
         const exerciseId = await ctx.runMutation(api.plans.createExercise, {
             name: "Running",
@@ -2739,7 +2732,7 @@ export const getOrCreateRunningExercise = action({
             equipment: "none",
             instructions: ["Run at a steady pace", "Maintain proper running form", "Focus on breathing rhythm"],
         });
-        
+
         return exerciseId;
     },
 });
@@ -2828,7 +2821,7 @@ export const changePlanSplit = action({
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayStr = today.toISOString().split("T")[0];
-        
+
         const sessions = await ctx.runQuery(api.plans.getWorkoutSessionsByPlan, {
             planId: args.planId,
         });
@@ -3034,5 +3027,197 @@ export const importMeals = action({
             results,
             errors,
         };
+    },
+});
+
+/**
+ * Query to get exercise progress over time for a user
+ */
+export const getExerciseProgress = query({
+    args: {
+        userId: v.id("users"),
+        exerciseId: v.id("exercises"),
+    },
+    handler: async (ctx, args) => {
+        const sessions = await ctx.db
+            .query("workout_sessions")
+            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+            .order("asc")
+            .collect();
+
+        const progress = [];
+        for (const session of sessions) {
+            const sets = await ctx.db
+                .query("exercise_sets")
+                .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
+                .filter((q) => q.eq(q.field("exerciseId"), args.exerciseId))
+                .filter((q) => q.eq(q.field("completed"), true))
+                .collect();
+
+            if (sets.length > 0) {
+                const maxWeight = Math.max(...sets.map((s) => s.actualWeight || s.plannedWeight));
+                const avgReps = sets.reduce((sum, s) => sum + (s.actualReps || s.plannedReps), 0) / sets.length;
+                const totalVolume = sets.reduce(
+                    (sum, s) => sum + (s.actualWeight || s.plannedWeight) * (s.actualReps || s.plannedReps),
+                    0
+                );
+
+                progress.push({
+                    date: session.date,
+                    maxWeight,
+                    avgReps: Math.round(avgReps * 10) / 10,
+                    totalVolume,
+                    setsCompleted: sets.length,
+                });
+            }
+        }
+
+        return progress;
+    },
+});
+
+/**
+ * Query to get all exercises with progress data for a user
+ */
+export const getAllExerciseProgress = query({
+    args: {
+        userId: v.id("users"),
+    },
+    handler: async (ctx, args) => {
+        const sessions = await ctx.db
+            .query("workout_sessions")
+            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+            .order("asc")
+            .collect();
+
+        const exerciseMap = new Map<string, any>();
+
+        for (const session of sessions) {
+            const sets = await ctx.db
+                .query("exercise_sets")
+                .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
+                .filter((q) => q.eq(q.field("completed"), true))
+                .collect();
+
+            for (const set of sets) {
+                const exercise = await ctx.db.get(set.exerciseId);
+                if (!exercise) continue;
+
+                const key = exercise._id;
+                if (!exerciseMap.has(key)) {
+                    exerciseMap.set(key, {
+                        exercise,
+                        progress: [],
+                        latestWeight: 0,
+                        latestDate: "",
+                    });
+                }
+
+                const data = exerciseMap.get(key)!;
+                const weight = set.actualWeight || set.plannedWeight;
+                const reps = set.actualReps || set.plannedReps;
+
+                if (session.date > data.latestDate) {
+                    data.latestDate = session.date;
+                    data.latestWeight = weight;
+                }
+
+                data.progress.push({
+                    date: session.date,
+                    weight,
+                    reps,
+                    volume: weight * reps,
+                });
+            }
+        }
+
+        return Array.from(exerciseMap.values()).map((data) => ({
+            exercise: data.exercise,
+            latestWeight: data.latestWeight,
+            latestDate: data.latestDate,
+            totalSessions: new Set(data.progress.map((p: any) => p.date)).size,
+        }));
+    },
+});
+
+/**
+ * Query to get body part strength analysis
+ */
+export const getBodyPartStrength = query({
+    args: {
+        userId: v.id("users"),
+    },
+    handler: async (ctx, args) => {
+        const sessions = await ctx.db
+            .query("workout_sessions")
+            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+            .order("desc")
+            .take(30); // Last 30 sessions
+
+        const bodyPartMap = new Map<string, { totalVolume: number; sessions: number; exercises: Set<string> }>();
+
+        for (const session of sessions) {
+            const sets = await ctx.db
+                .query("exercise_sets")
+                .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
+                .filter((q) => q.eq(q.field("completed"), true))
+                .collect();
+
+            for (const set of sets) {
+                const exercise = await ctx.db.get(set.exerciseId);
+                if (!exercise) continue;
+
+                const bodyPart = exercise.bodyPart;
+                if (!bodyPartMap.has(bodyPart)) {
+                    bodyPartMap.set(bodyPart, {
+                        totalVolume: 0,
+                        sessions: 0,
+                        exercises: new Set(),
+                    });
+                }
+
+                const data = bodyPartMap.get(bodyPart)!;
+                const weight = set.actualWeight || set.plannedWeight;
+                const reps = set.actualReps || set.plannedReps;
+                data.totalVolume += weight * reps;
+                data.exercises.add(exercise.name);
+            }
+        }
+
+        // Count unique sessions per body part
+        for (const session of sessions) {
+            const sets = await ctx.db
+                .query("exercise_sets")
+                .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
+                .filter((q) => q.eq(q.field("completed"), true))
+                .collect();
+
+            const bodyPartsInSession = new Set<string>();
+            for (const set of sets) {
+                const exercise = await ctx.db.get(set.exerciseId);
+                if (exercise && exercise.bodyPart) {
+                    bodyPartsInSession.add(exercise.bodyPart);
+                }
+            }
+
+            for (const bodyPart of bodyPartsInSession) {
+                const data = bodyPartMap.get(bodyPart);
+                if (data) {
+                    data.sessions += 1;
+                }
+            }
+        }
+
+        const result = Array.from(bodyPartMap.entries()).map(([bodyPart, data]) => ({
+            bodyPart,
+            totalVolume: data.totalVolume,
+            sessions: data.sessions,
+            exerciseCount: data.exercises.size,
+        }));
+
+        // Sort by total volume
+        result.sort((a, b) => b.totalVolume - a.totalVolume);
+
+        return result;
     },
 });

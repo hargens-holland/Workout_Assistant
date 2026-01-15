@@ -3,11 +3,9 @@ import { WebhookEvent } from "@clerk/nextjs/server";
 import { Webhook } from "svix";
 import { api } from "./_generated/api";
 import { httpAction } from "./_generated/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "./llm";
 
 const http = httpRouter();
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 http.route({
     path: "/clerk-webhook",
@@ -142,15 +140,6 @@ http.route({
 
             console.log("Payload is here:", payload);
 
-            const model = genAI.getGenerativeModel({
-                model: "gemini-2.0-flash-001",
-                generationConfig: {
-                    temperature: 0.4, // lower temperature for more predictable outputs
-                    topP: 0.9,
-                    responseMimeType: "application/json",
-                },
-            });
-
             const strategyPrompt = `You are an expert strength and conditioning coach.
 
 Your task is to design a LONG-TERM TRAINING STRATEGY that maximizes
@@ -216,8 +205,10 @@ Respond ONLY with valid JSON using this schema:
 
 Do not include any text outside the JSON.`;
 
-            const strategyResult = await model.generateContent(strategyPrompt);
-            const strategyText = strategyResult.response.text();
+            const strategyText = await generateText({
+                messages: [{ role: "user", content: strategyPrompt }],
+                modelRole: "planning",
+            });
 
             // VALIDATE THE INPUT COMING FROM AI
             let trainingStrategy = JSON.parse(strategyText);
@@ -266,8 +257,10 @@ Do not include any text outside the JSON.`;
         
         DO NOT add any fields that are not in this example. Your response must be a valid JSON object with no additional text.`;
 
-            const dietResult = await model.generateContent(dietPrompt);
-            const dietPlanText = dietResult.response.text();
+            const dietPlanText = await generateText({
+                messages: [{ role: "user", content: dietPrompt }],
+                modelRole: "planning",
+            });
 
             // VALIDATE THE INPUT COMING FROM AI
             let dietPlan = JSON.parse(dietPlanText);
