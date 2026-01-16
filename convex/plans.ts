@@ -2672,6 +2672,158 @@ export const getBodyPartStrength = query({
 });
 
 /**
+ * Query to get workout history by body part for body tracker visualization
+ * Returns data in format: { bodyPart: string, workouts: { exerciseName: string, entries: Array<{date, weight, reps}> } }
+ */
+export const getBodyPartWorkoutHistory = query({
+    args: {
+        userId: v.id("users"),
+    },
+    handler: async (ctx, args) => {
+        // Get all completed workout sessions
+        const sessions = await ctx.db
+            .query("workout_sessions")
+            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+            .order("desc")
+            .take(100); // Last 100 sessions
+
+        // Map: bodyPart -> exerciseName -> entries[]
+        const historyMap = new Map<string, Map<string, Array<{ date: string; weight: number; reps: number }>>>();
+
+        for (const session of sessions) {
+            const sets = await ctx.db
+                .query("exercise_sets")
+                .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
+                .filter((q) => q.eq(q.field("completed"), true))
+                .collect();
+
+            for (const set of sets) {
+                const exercise = await ctx.db.get(set.exerciseId);
+                if (!exercise) continue;
+
+                const bodyPart = exercise.bodyPart.toLowerCase();
+                const exerciseName = exercise.name;
+                const weight = set.actualWeight || set.plannedWeight;
+                const reps = set.actualReps || set.plannedReps;
+
+                if (!historyMap.has(bodyPart)) {
+                    historyMap.set(bodyPart, new Map());
+                }
+
+                const exerciseMap = historyMap.get(bodyPart)!;
+                if (!exerciseMap.has(exerciseName)) {
+                    exerciseMap.set(exerciseName, []);
+                }
+
+                exerciseMap.get(exerciseName)!.push({
+                    date: session.date,
+                    weight,
+                    reps,
+                });
+            }
+        }
+
+        // Convert to the format expected by the component
+        const result: Record<string, { name: string; workouts: Record<string, Array<{ date: string; weight: number; reps: number }>> }> = {};
+
+        for (const [bodyPart, exerciseMap] of historyMap.entries()) {
+            const workouts: Record<string, Array<{ date: string; weight: number; reps: number }>> = {};
+            for (const [exerciseName, entries] of exerciseMap.entries()) {
+                // Sort by date and get unique dates (take max weight/reps per date)
+                const dateMap = new Map<string, { weight: number; reps: number }>();
+                for (const entry of entries) {
+                    const existing = dateMap.get(entry.date);
+                    if (!existing || entry.weight > existing.weight) {
+                        dateMap.set(entry.date, { weight: entry.weight, reps: entry.reps });
+                    }
+                }
+                workouts[exerciseName] = Array.from(dateMap.entries())
+                    .map(([date, data]) => ({ date, ...data }))
+                    .sort((a, b) => a.date.localeCompare(b.date));
+            }
+            result[bodyPart] = {
+                name: bodyPart.charAt(0).toUpperCase() + bodyPart.slice(1),
+                workouts,
+            };
+        }
+
+        return result;
+    },
+});
+
+/**
+ * Query to get exercises by body part
+ */
+export const getExercisesByBodyPart = query({
+    args: {
+        bodyPart: v.string(),
+    },
+    handler: async (ctx, args) => {
+        return await ctx.db
+            .query("exercises")
+            .withIndex("by_body_part", (q) => q.eq("bodyPart", args.bodyPart.toLowerCase()))
+            .collect();
+    },
+});
+
+/**
+ * Mutation to log a workout from body tracker
+ * Creates a workout session and exercise sets
+ */
+export const logBodyTrackerWorkout = mutation({
+    args: {
+        userId: v.id("users"),
+        date: v.string(),
+        exerciseId: v.id("exercises"),
+        weight: v.number(),
+        reps: v.number(),
+    },
+    handler: async (ctx, args) => {
+        // Check if workout session exists for this date
+        let session = await ctx.db
+            .query("workout_sessions")
+            .withIndex("by_user_and_date", (q) => q.eq("userId", args.userId).eq("date", args.date))
+            .first();
+
+        let sessionId: Id<"workout_sessions">;
+        if (!session) {
+            // Create a new workout session
+            sessionId = await ctx.db.insert("workout_sessions", {
+                userId: args.userId,
+                date: args.date,
+                intensity: "moderate",
+                dayOfWeek: new Date(args.date).toLocaleDateString("en-US", { weekday: "long" }),
+            });
+        } else {
+            sessionId = session._id;
+        }
+
+        // Get existing sets for this exercise in this session
+        const existingSets = await ctx.db
+            .query("exercise_sets")
+            .withIndex("by_session_id", (q) => q.eq("sessionId", sessionId))
+            .filter((q) => q.eq(q.field("exerciseId"), args.exerciseId))
+            .collect();
+
+        const setNumber = existingSets.length + 1;
+
+        // Create the exercise set
+        await ctx.db.insert("exercise_sets", {
+            sessionId,
+            exerciseId: args.exerciseId,
+            plannedWeight: args.weight,
+            plannedReps: args.reps,
+            actualWeight: args.weight,
+            actualReps: args.reps,
+            completed: true,
+            setNumber,
+        });
+
+        return { success: true, sessionId };
+    },
+});
+
+/**
  * Query to get recent workouts in RecentWorkout format for constraint computation
  */
 export const getRecentWorkoutsForConstraints = query({

@@ -9,9 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Page } from "@/components/layout/Page";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Section } from "@/components/layout/Section";
-import { DumbbellIcon, CalendarIcon, HistoryIcon, RefreshCwIcon, BanIcon, MinusIcon } from "lucide-react";
+import { DumbbellIcon, CalendarIcon, HistoryIcon, RefreshCwIcon, BanIcon, MinusIcon, ActivityIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import BodyWorkoutTracker from "@/components/BodyWorkoutTracker";
 
 const WorkoutsPage = () => {
     const { user } = useUser();
@@ -87,6 +88,23 @@ const WorkoutsPage = () => {
                     title="Workouts"
                     description="Manage your training schedule and exercise history"
                 />
+
+                {/* Body Workout Tracker */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-3 text-xl">
+                            <div className="p-2 bg-primary/10 rounded-xl">
+                                <ActivityIcon className="h-5 w-5 text-primary" />
+                            </div>
+                            Body Workout Tracker
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {convexUser?._id && (
+                            <BodyWorkoutTracker userId={convexUser._id} />
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Current Focus */}
                 <Card>
