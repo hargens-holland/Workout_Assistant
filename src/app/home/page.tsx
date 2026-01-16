@@ -7,10 +7,11 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Page } from "@/components/layout/Page";
-import { DumbbellIcon, CheckIcon, PlusIcon, ArrowUpRightIcon, PencilIcon, DropletIcon, AppleIcon, MessageSquareIcon, SendIcon, ChevronDownIcon, ChevronUpIcon, TargetIcon } from "lucide-react";
+import { DumbbellIcon, CheckIcon, PlusIcon, ArrowUpRightIcon, PencilIcon, DropletIcon, AppleIcon, MessageSquareIcon, SendIcon, ChevronDownIcon, ChevronUpIcon, TargetIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import WaterBottle from "@/components/WaterBottle";
 
 const HomePage = () => {
     const { user } = useUser();
@@ -40,10 +41,10 @@ const HomePage = () => {
         api.plans.getWorkoutsByDateRange,
         convexUser?._id
             ? {
-                  userId: convexUser._id,
-                  startDate: today,
-                  endDate: today,
-              }
+                userId: convexUser._id,
+                startDate: today,
+                endDate: today,
+            }
             : "skip"
     );
 
@@ -70,6 +71,7 @@ const HomePage = () => {
     const [generatingWorkout, setGeneratingWorkout] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
+    const [waterExpanded, setWaterExpanded] = useState(false);
 
     // Calculate nutrition stats (default target calories)
     const targetCalories = 2000; // Default, can be computed from goals later
@@ -90,10 +92,10 @@ const HomePage = () => {
         api.plans.getWorkoutsByDateRange,
         convexUser?._id
             ? {
-                  userId: convexUser._id,
-                  startDate: weekStartStr,
-                  endDate: weekEndStr,
-              }
+                userId: convexUser._id,
+                startDate: weekStartStr,
+                endDate: weekEndStr,
+            }
             : "skip"
     );
 
@@ -118,8 +120,13 @@ const HomePage = () => {
     const completedGoals = dailyGoals.filter(g => g.completed).length;
     const goalsProgress = (completedGoals / dailyGoals.length) * 100;
 
-    // Water intake (mock data - would come from user data)
-    const waterIntake = 0.7; // liters
+    // Get water intake from database
+    const dailyTracking = useQuery(
+        api.dailyTracking.getDailyTracking,
+        convexUser?._id ? { userId: convexUser._id, date: today } : "skip"
+    );
+
+    const waterIntake = dailyTracking?.waterIntake || 0; // liters
     const waterTarget = 2.0; // liters
 
     // Steps (mock data)
@@ -304,8 +311,8 @@ const HomePage = () => {
                                                     item.isToday
                                                         ? "bg-[#C7F000] h-full"
                                                         : item.hours > 0
-                                                        ? "bg-[#E6EAF0] h-full"
-                                                        : "bg-[#6B7280] h-2"
+                                                            ? "bg-[#E6EAF0] h-full"
+                                                            : "bg-[#6B7280] h-2"
                                                 )}
                                                 style={{
                                                     height: item.hours > 0 ? `${Math.min(100, (item.hours / 2) * 100)}%` : "8px",
@@ -392,28 +399,26 @@ const HomePage = () => {
                         transition={{ delay: 0.3 }}
                         className="lg:col-span-4"
                     >
-                        <Card className="h-full relative overflow-hidden">
+                        <Card className="h-full relative overflow-hidden cursor-pointer" onClick={() => setWaterExpanded(true)}>
                             <CardHeader>
                                 <CardTitle className="text-[#E6EAF0]">Water</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="relative h-32 mb-4">
-                                    {/* Water visualization */}
-                                    <div className="absolute bottom-0 left-0 right-0 h-full flex items-end">
-                                        <div
-                                            className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg transition-all duration-500"
-                                            style={{ height: `${(waterIntake / waterTarget) * 100}%` }}
+                                <div className="flex items-center justify-center py-4">
+                                    {convexUser?._id && (
+                                        <WaterBottle
+                                            userId={convexUser._id}
+                                            date={today}
+                                            targetAmount={waterTarget}
+                                            compact={true}
+                                            onExpand={() => setWaterExpanded(true)}
                                         />
-                                    </div>
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <span className="text-2xl font-semibold text-[#E6EAF0]">{waterIntake}L</span>
-                                    </div>
+                                    )}
                                 </div>
-                                <button
-                                    className="absolute bottom-4 right-4 size-12 rounded-full bg-[#C7F000] text-[#0B0F14] flex items-center justify-center shadow-[0_0_20px_rgba(199,240,0,0.35)] hover:shadow-[0_0_30px_rgba(199,240,0,0.35)] hover:scale-105 transition-all"
-                                >
-                                    <PlusIcon size={20} />
-                                </button>
+                                <div className="flex items-center justify-between mt-4">
+                                    <span className="text-sm text-[#9AA3B2]">Today</span>
+                                    <span className="text-xl font-semibold text-[#E6EAF0]">{waterIntake.toFixed(1)}L / {waterTarget}L</span>
+                                </div>
                             </CardContent>
                         </Card>
                     </motion.div>
@@ -866,8 +871,8 @@ const HomePage = () => {
                                         Today's Workout
                                     </CardTitle>
                                     {!todayWorkout && (
-                                        <Button 
-                                            onClick={handleGenerateToday} 
+                                        <Button
+                                            onClick={handleGenerateToday}
                                             size="sm"
                                             disabled={generatingWorkout}
                                         >
@@ -880,7 +885,7 @@ const HomePage = () => {
                                 {todayWorkout ? (
                                     <div className="space-y-4">
                                         {todayWorkout.exercises
-                                            .filter((e: any, idx: number, arr: any[]) => 
+                                            .filter((e: any, idx: number, arr: any[]) =>
                                                 arr.findIndex((x: any) => x.exercise?._id === e.exercise?._id) === idx
                                             )
                                             .map((exerciseSet: any, idx: number) => {
@@ -905,8 +910,8 @@ const HomePage = () => {
                                                         key={idx}
                                                         className={cn(
                                                             "rounded-xl p-5 transition-all duration-200",
-                                                            allCompleted 
-                                                                ? "bg-[#C7F000]/10 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.7)]" 
+                                                            allCompleted
+                                                                ? "bg-[#C7F000]/10 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.7)]"
                                                                 : "bg-[#1B212B] shadow-[0_20px_40px_-20px_rgba(0,0,0,0.7)] hover:shadow-[0_25px_50px_-20px_rgba(0,0,0,0.8)] hover:-translate-y-0.5"
                                                         )}
                                                     >
@@ -986,6 +991,45 @@ const HomePage = () => {
                     </motion.div>
                 </div>
             </div>
+
+            {/* Water Bottle Expanded Modal */}
+            <AnimatePresence>
+                {waterExpanded && convexUser?._id && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-[#0B0F14]/95 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setWaterExpanded(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-[#161B22] rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-2xl font-semibold text-[#E6EAF0]">Water Tracker</h2>
+                                <button
+                                    onClick={() => setWaterExpanded(false)}
+                                    className="p-2 rounded-lg hover:bg-[#1B212B] text-[#9AA3B2] hover:text-[#E6EAF0] transition-colors"
+                                >
+                                    <XIcon className="h-6 w-6" />
+                                </button>
+                            </div>
+                            <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
+                                <WaterBottle
+                                    userId={convexUser._id}
+                                    date={today}
+                                    targetAmount={waterTarget}
+                                    compact={false}
+                                />
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
