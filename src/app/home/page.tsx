@@ -12,6 +12,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import WaterBottle from "@/components/WaterBottle";
+import StepsMountainCard from "@/components/StepsMountainCard";
 
 const HomePage = () => {
     const { user } = useUser();
@@ -53,6 +54,7 @@ const HomePage = () => {
     const generateTodayWorkout = useAction(api.plans.generateDailyWorkoutAndMeals);
     const deleteWorkoutSession = useMutation(api.plans.deleteWorkoutSession);
     const chatCommand = useAction(api.chat.chatCommand);
+    const updateSteps = useMutation(api.dailyTracking.updateSteps);
 
     const [newMealLog, setNewMealLog] = useState({
         name: "",
@@ -109,17 +111,6 @@ const HomePage = () => {
         return total;
     }, 0) || 0;
 
-    // Calculate daily goals completion
-    const dailyGoals = [
-        { id: 1, label: "Sleep 7+ hours", completed: true, icon: "😴" },
-        { id: 2, label: "Drink 2L of water", completed: false, icon: "💧" },
-        { id: 3, label: "Complete workout", completed: todayWorkout?.exercises?.every((e: any) => e.completed) || false, icon: "💪" },
-        { id: 4, label: "10 000 Steps", completed: false, icon: "🚶" },
-        { id: 5, label: "1 500 Calories", completed: totalCalories >= 1500, icon: "🍎" },
-    ];
-    const completedGoals = dailyGoals.filter(g => g.completed).length;
-    const goalsProgress = (completedGoals / dailyGoals.length) * 100;
-
     // Get water intake from database
     const dailyTracking = useQuery(
         api.dailyTracking.getDailyTracking,
@@ -129,11 +120,20 @@ const HomePage = () => {
     const waterIntake = dailyTracking?.waterIntake || 0; // liters
     const waterTarget = 2.0; // liters
 
-    // Steps (mock data)
-    const steps = 5400; // steps
+    // Steps from Convex
+    const steps = dailyTracking?.steps || 0; // steps
     const stepsTarget = 10000; // steps
-    const stepsKm = (steps * 0.0008).toFixed(1); // approximate conversion
-    const stepsProgress = (steps / stepsTarget) * 100;
+
+    // Calculate daily goals completion
+    const dailyGoals = [
+        { id: 1, label: "Sleep 7+ hours", completed: true, icon: "😴" },
+        { id: 2, label: "Drink 2L of water", completed: false, icon: "💧" },
+        { id: 3, label: "Complete workout", completed: todayWorkout?.exercises?.every((e: any) => e.completed) || false, icon: "💪" },
+        { id: 4, label: "10 000 Steps", completed: steps >= stepsTarget, icon: "🚶" },
+        { id: 5, label: "1 500 Calories", completed: totalCalories >= 1500, icon: "🍎" },
+    ];
+    const completedGoals = dailyGoals.filter(g => g.completed).length;
+    const goalsProgress = (completedGoals / dailyGoals.length) * 100;
 
     // Workout chart data (days of week)
     const days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -342,54 +342,23 @@ const HomePage = () => {
                         transition={{ delay: 0.2 }}
                         className="lg:col-span-4"
                     >
-                        <Card className="h-full">
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-[#E6EAF0]">Steps</CardTitle>
-                                    <button className="size-8 rounded-full bg-[#161B22] flex items-center justify-center text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#1B212B] transition-all">
-                                        <ArrowUpRightIcon size={16} />
-                                    </button>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                {/* Circular Progress */}
-                                <div className="flex items-center justify-center mb-4">
-                                    <div className="relative size-32">
-                                        <svg className="transform -rotate-90 size-32">
-                                            <circle
-                                                cx="64"
-                                                cy="64"
-                                                r="56"
-                                                stroke="#161B22"
-                                                strokeWidth="12"
-                                                fill="none"
-                                            />
-                                            <circle
-                                                cx="64"
-                                                cy="64"
-                                                r="56"
-                                                stroke="#C7F000"
-                                                strokeWidth="12"
-                                                fill="none"
-                                                strokeDasharray={`${2 * Math.PI * 56}`}
-                                                strokeDashoffset={`${2 * Math.PI * 56 * (1 - stepsProgress / 100)}`}
-                                                strokeLinecap="round"
-                                                className="transition-all duration-500"
-                                            />
-                                        </svg>
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="text-center">
-                                                <div className="text-xl font-semibold text-[#E6EAF0]">{stepsKm}km</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-[#9AA3B2]">Goal</span>
-                                    <span className="text-xl font-semibold text-[#E6EAF0]">10km</span>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <StepsMountainCard
+                            steps={steps}
+                            goalSteps={stepsTarget}
+                            title="Steps"
+                            onUpdateSteps={async (newSteps: number) => {
+                                if (!convexUser?._id) return;
+                                try {
+                                    await updateSteps({
+                                        userId: convexUser._id,
+                                        date: today,
+                                        steps: newSteps,
+                                    });
+                                } catch (error) {
+                                    console.error("Failed to update steps:", error);
+                                }
+                            }}
+                        />
                     </motion.div>
 
                     {/* Water Card - Middle */}
