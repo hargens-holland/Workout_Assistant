@@ -21,8 +21,8 @@ const ProgressPage = () => {
         user?.id ? { clerkId: user.id } : "skip"
     );
 
-    const activePlan = useQuery(
-        api.plans.getActivePlan,
+    const activeGoal = useQuery(
+        api.goals.getActiveGoal,
         convexUser?._id ? { userId: convexUser._id } : "skip"
     );
 
@@ -45,24 +45,22 @@ const ProgressPage = () => {
 
     // Calculate goal progress
     const goalProgress = useMemo(() => {
-        if (!activePlan?.trainingStrategy) return null;
+        if (!activeGoal) return null;
 
-        const strategy = activePlan.trainingStrategy as any;
-        const planStartDate = new Date(activePlan._creationTime);
+        const goalStartDate = new Date(activeGoal._creationTime);
         const now = new Date();
-        const weeksElapsed = Math.floor((now.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
-        const totalWeeks = strategy.time_horizon_weeks || 12;
-        const progressPercent = Math.min(100, Math.max(0, (weeksElapsed / totalWeeks) * 100));
+        const daysElapsed = Math.floor((now.getTime() - goalStartDate.getTime()) / (1000 * 60 * 60 * 24));
+        const weeksElapsed = Math.floor(daysElapsed / 7);
 
         return {
-            goal: strategy.goal_type || "No specific goal",
-            primaryFocus: strategy.primary_focus || "General fitness",
+            goal: activeGoal.category.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase()) || "No specific goal",
+            primaryFocus: activeGoal.target?.exercise || activeGoal.target?.movement || "General fitness",
             weeksElapsed,
-            totalWeeks,
-            progressPercent,
-            weeksRemaining: Math.max(0, totalWeeks - weeksElapsed),
+            daysElapsed,
+            targetValue: activeGoal.value,
+            targetUnit: activeGoal.unit,
         };
-    }, [activePlan]);
+    }, [activeGoal]);
 
     // Project future goal achievement
     const goalProjection = useMemo(() => {
@@ -125,16 +123,16 @@ const ProgressPage = () => {
         );
     }
 
-    if (!activePlan) {
+    if (!activeGoal) {
         return (
             <Page>
                 <Card className="max-w-2xl mx-auto">
                     <CardContent className="pt-6">
                         <div className="text-center space-y-4">
-                            <h2 className="text-2xl font-semibold">No Active Plan</h2>
-                            <p className="text-muted-foreground">Create a plan to track progress.</p>
+                            <h2 className="text-2xl font-semibold">No Active Goal</h2>
+                            <p className="text-muted-foreground">Create a goal to track progress.</p>
                             <Button asChild className="mt-4">
-                                <Link href="/generate-program">Create Plan</Link>
+                                <Link href="/generate-program">Create Goal</Link>
                             </Button>
                         </div>
                     </CardContent>
@@ -162,31 +160,28 @@ const ProgressPage = () => {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <div className="text-sm font-medium text-muted-foreground mb-1">Goal</div>
-                                <div className="font-semibold text-lg">{goalProgress.goal}</div>
+                                <div className="text-sm font-medium text-muted-foreground mb-1">Goal Category</div>
+                                <div className="font-semibold text-lg capitalize">{goalProgress.goal}</div>
                             </div>
-                            <div>
-                                <div className="text-sm font-medium text-muted-foreground mb-1">Primary Focus</div>
-                                <div className="font-medium">{goalProgress.primaryFocus}</div>
-                            </div>
+                            {goalProgress.primaryFocus && (
+                                <div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-1">Primary Focus</div>
+                                    <div className="font-medium">{goalProgress.primaryFocus}</div>
+                                </div>
+                            )}
+                            {goalProgress.targetValue && (
+                                <div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-1">Target</div>
+                                    <div className="font-medium">{goalProgress.targetValue} {goalProgress.targetUnit || ""}</div>
+                                </div>
+                            )}
                             <div>
                                 <div className="flex items-center justify-between text-sm mb-2">
-                                    <span className="text-muted-foreground">Time Progress</span>
+                                    <span className="text-muted-foreground">Time Active</span>
                                     <span className="font-semibold">
-                                        {goalProgress.weeksElapsed} / {goalProgress.totalWeeks} weeks
+                                        {goalProgress.weeksElapsed} weeks ({goalProgress.daysElapsed} days)
                                     </span>
                                 </div>
-                                <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-                                    <div
-                                        className="bg-primary h-full rounded-full transition-all duration-300"
-                                        style={{ width: `${goalProgress.progressPercent}%` }}
-                                    />
-                                </div>
-                                {goalProgress.weeksRemaining > 0 && (
-                                    <div className="text-xs text-muted-foreground mt-1.5">
-                                        {goalProgress.weeksRemaining} weeks remaining
-                                    </div>
-                                )}
                             </div>
                         </CardContent>
                     </Card>

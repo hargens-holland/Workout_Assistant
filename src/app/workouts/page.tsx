@@ -22,8 +22,8 @@ const WorkoutsPage = () => {
         user?.id ? { clerkId: user.id } : "skip"
     );
 
-    const activePlan = useQuery(
-        api.plans.getActivePlan,
+    const activeGoal = useQuery(
+        api.goals.getActiveGoal,
         convexUser?._id ? { userId: convexUser._id } : "skip"
     );
 
@@ -33,8 +33,8 @@ const WorkoutsPage = () => {
     );
 
     const workoutHistory = useQuery(
-        api.workoutEditing.getWorkoutHistory,
-        convexUser?._id ? { userId: convexUser._id } : "skip"
+        api.plans.getWorkoutHistory,
+        convexUser?._id ? { userId: convexUser._id, limit: 14 } : "skip"
     );
 
     const selectedWorkout = useQuery(
@@ -62,16 +62,16 @@ const WorkoutsPage = () => {
         );
     }
 
-    if (!activePlan) {
+    if (!activeGoal) {
         return (
             <Page>
                 <Card className="max-w-2xl mx-auto">
                     <CardContent className="pt-6">
                         <div className="text-center space-y-4">
-                            <h2 className="text-2xl font-semibold">No Active Plan</h2>
-                            <p className="text-muted-foreground">Create a plan to view workouts.</p>
+                            <h2 className="text-2xl font-semibold">No Active Goal</h2>
+                            <p className="text-muted-foreground">Create a goal to view workouts.</p>
                             <Button asChild className="mt-4">
-                                <Link href="/generate-program">Create Plan</Link>
+                                <Link href="/generate-program">Create Goal</Link>
                             </Button>
                         </div>
                     </CardContent>
@@ -79,8 +79,6 @@ const WorkoutsPage = () => {
             </Page>
         );
     }
-
-    const trainingStrategy = activePlan.trainingStrategy as any;
 
     return (
         <Page>
@@ -96,23 +94,33 @@ const WorkoutsPage = () => {
                         <CardTitle className="text-xl">Current Focus</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {trainingStrategy ? (
+                        {activeGoal ? (
                             <div className="space-y-4">
                                 <div>
-                                    <span className="text-sm font-medium text-muted-foreground">Goal: </span>
-                                    <span className="font-semibold text-base">{trainingStrategy.goal_type}</span>
+                                    <span className="text-sm font-medium text-muted-foreground">Goal Category: </span>
+                                    <span className="font-semibold text-base capitalize">{activeGoal.category.replace("_", " ")}</span>
                                 </div>
-                                <div>
-                                    <span className="text-sm font-medium text-muted-foreground">Primary Focus: </span>
-                                    <span className="font-semibold text-base">{trainingStrategy.primary_focus}</span>
-                                </div>
-                                <div>
-                                    <span className="text-sm font-medium text-muted-foreground">Priorities: </span>
-                                    <span className="text-base">{trainingStrategy.training_priorities?.join(", ") || "None"}</span>
-                                </div>
+                                {activeGoal.direction && (
+                                    <div>
+                                        <span className="text-sm font-medium text-muted-foreground">Direction: </span>
+                                        <span className="font-semibold text-base capitalize">{activeGoal.direction}</span>
+                                    </div>
+                                )}
+                                {activeGoal.target?.exercise && (
+                                    <div>
+                                        <span className="text-sm font-medium text-muted-foreground">Target Exercise: </span>
+                                        <span className="font-semibold text-base">{activeGoal.target.exercise}</span>
+                                    </div>
+                                )}
+                                {activeGoal.value && (
+                                    <div>
+                                        <span className="text-sm font-medium text-muted-foreground">Target: </span>
+                                        <span className="font-semibold text-base">{activeGoal.value} {activeGoal.unit || ""}</span>
+                                    </div>
+                                )}
                             </div>
                         ) : (
-                            <p className="text-muted-foreground">No training strategy defined.</p>
+                            <p className="text-muted-foreground">No active goal defined.</p>
                         )}
                     </CardContent>
                 </Card>
@@ -307,7 +315,7 @@ const WorkoutsPage = () => {
                                                 <div className="flex items-center justify-between mb-4">
                                                     <h4 className="font-semibold text-base">{exercise?.name || "Unknown"}</h4>
                                                     <div className="flex gap-2">
-                                                        {convexUser?._id && activePlan?._id && exercise?._id && (
+                                                        {convexUser?._id && exercise?._id && (
                                                             <>
                                                                 <Button
                                                                     size="sm"
@@ -319,7 +327,6 @@ const WorkoutsPage = () => {
                                                                             await regenerateExercise({
                                                                                 exerciseSetId: setsForExercise[0]._id,
                                                                                 userId: convexUser._id,
-                                                                                planId: activePlan._id,
                                                                                 sessionId: selectedWorkout._id,
                                                                             });
                                                                         } catch (error) {

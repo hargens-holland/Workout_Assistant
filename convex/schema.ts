@@ -7,6 +7,12 @@ export default defineSchema({
         email: v.string(),
         avatar: v.optional(v.string()),
         clerkId: v.string(),
+        height_cm: v.optional(v.number()),
+        weight_kg: v.optional(v.number()),
+        experience_level: v.optional(v.union(v.literal("beginner"), v.literal("intermediate"), v.literal("advanced"))),
+        equipment_access: v.optional(v.any()),
+        injury_constraints: v.optional(v.array(v.string())),
+        preferences: v.optional(v.any()),
     }).index("by_clerk_id", ["clerkId"]),
 
     plans: defineTable({
@@ -64,6 +70,34 @@ export default defineSchema({
                 light: v.number(),
             }),
         })),
+        goals: v.optional(v.array(v.object({
+            category: v.union(
+                v.literal("body_composition"),
+                v.literal("strength"),
+                v.literal("endurance"),
+                v.literal("mobility"),
+                v.literal("skill")
+            ),
+            target: v.optional(v.object({
+                exercise: v.optional(v.string()),
+                movement: v.optional(v.string()),
+                metric: v.optional(v.union(
+                    v.literal("weight"),
+                    v.literal("reps"),
+                    v.literal("time"),
+                    v.literal("distance"),
+                    v.literal("rom")
+                )),
+            })),
+            direction: v.optional(v.union(
+                v.literal("increase"),
+                v.literal("decrease"),
+                v.literal("achieve")
+            )),
+            value: v.optional(v.number()),
+            unit: v.optional(v.string()),
+            priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+        }))),
         isActive: v.boolean(),
     })
         .index("by_user_id", ["userId"])
@@ -90,15 +124,16 @@ export default defineSchema({
 
     workout_sessions: defineTable({
         userId: v.id("users"),
-        planId: v.id("plans"),
         date: v.string(),
-        weekNumber: v.number(),
-        dayOfWeek: v.string(),
+        weekNumber: v.optional(v.number()),
+        dayOfWeek: v.optional(v.string()),
         intensity: v.string(),
+        workoutExplanation: v.optional(v.string()), // AI-generated explanation of why this workout was chosen
+        mealExplanation: v.optional(v.string()), // AI-generated explanation of why these meals were chosen
     })
         .index("by_user_id", ["userId"])
-        .index("by_plan_id", ["planId"])
-        .index("by_date", ["date"]),
+        .index("by_date", ["date"])
+        .index("by_user_and_date", ["userId", "date"]),
 
     exercise_sets: defineTable({
         sessionId: v.id("workout_sessions"),
@@ -144,4 +179,64 @@ export default defineSchema({
         .index("by_user_id", ["userId"])
         .index("by_date", ["date"])
         .index("by_user_and_date", ["userId", "date"]),
+
+    daily_tracking: defineTable({
+        userId: v.id("users"),
+        date: v.string(), // ISO date string (YYYY-MM-DD)
+        waterIntake: v.number(), // liters
+        steps: v.number(), // step count
+    })
+        .index("by_user_id", ["userId"])
+        .index("by_date", ["date"])
+        .index("by_user_and_date", ["userId", "date"]),
+
+    challenges: defineTable({
+        userId: v.id("users"),
+        challengeType: v.union(v.literal("pushup"), v.literal("pullup")),
+        startDate: v.string(), // ISO date string (YYYY-MM-DD)
+        endDate: v.string(), // ISO date string (YYYY-MM-DD)
+        targetReps: v.number(), // Target reps to achieve
+        currentReps: v.number(), // Current best reps
+        dailyLogs: v.array(v.object({
+            date: v.string(),
+            reps: v.number(),
+        })),
+        completed: v.boolean(),
+    })
+        .index("by_user_id", ["userId"])
+        .index("by_type", ["challengeType"])
+        .index("by_user_and_type", ["userId", "challengeType"]),
+
+    goals: defineTable({
+        userId: v.id("users"),
+        category: v.union(
+            v.literal("body_composition"),
+            v.literal("strength"),
+            v.literal("endurance"),
+            v.literal("mobility"),
+            v.literal("skill")
+        ),
+        target: v.optional(v.object({
+            exercise: v.optional(v.string()),
+            movement: v.optional(v.string()),
+            metric: v.optional(v.union(
+                v.literal("weight"),
+                v.literal("reps"),
+                v.literal("time"),
+                v.literal("distance"),
+                v.literal("rom")
+            )),
+        })),
+        direction: v.optional(v.union(
+            v.literal("increase"),
+            v.literal("decrease"),
+            v.literal("achieve")
+        )),
+        value: v.optional(v.number()),
+        unit: v.optional(v.string()),
+        isActive: v.boolean(),
+    })
+        .index("by_user_id", ["userId"])
+        .index("by_active", ["isActive"])
+        .index("by_user_and_active", ["userId", "isActive"]),
 });

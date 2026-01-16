@@ -15,7 +15,6 @@ export type IntentType =
     | "WORKOUT_ADD_FOCUS"
     | "MEAL_SUGGEST"
     | "MEAL_LOG_QUICK"
-    | "SCHEDULE_MOVE_WORKOUT"
     | "BLOCK_ITEM"
     | "UNKNOWN";
 
@@ -46,7 +45,6 @@ const IntentSchema = z.object({
         "EDIT_TODAY_WORKOUT",
         "REGENERATE_TODAY_WORKOUT",
         "SWAP_EXERCISE",
-        "GENERATE_PLAN",
         "UPDATE_GOAL",
         "SWAP_MEAL",
         "LOG_MEAL",
@@ -67,7 +65,7 @@ type LLMIntent = z.infer<typeof IntentSchema>;
 
 async function parseIntent(
     message: string,
-    context: { date: string; activePlanId?: Id<"plans"> }
+    context: { date: string }
 ): Promise<Intent> {
     const systemPrompt = `You are an intent classifier for a fitness assistant app.
 
@@ -144,7 +142,7 @@ Example: {"intent": "SWAP_EXERCISE", "confidence": 0.9, "params": {"exerciseName
 
 function mapLLMIntentToInternal(
     llmIntent: LLMIntent,
-    context: { date: string; activePlanId?: Id<"plans"> }
+    context: { date: string }
 ): Intent {
     // [TEST LOG] Mapping decision
     console.log("🔄 [INTENT MAPPING] Mapping LLM intent:", llmIntent.intent, "→ internal intent");
@@ -196,7 +194,7 @@ function mapLLMIntentToInternal(
         case "SMALL_TALK":
         case "REQUEST_EXPLANATION":
         case "VIEW_PROGRESS":
-        case "GENERATE_PLAN":
+        // GENERATE_PLAN removed - use goal creation instead
         case "UPDATE_GOAL":
         case "SWAP_MEAL":
             // Map to UNKNOWN with original intent preserved
@@ -227,7 +225,7 @@ function mapLLMIntentToInternal(
 async function executeIntent(
     ctx: any,
     intent: Intent,
-    context: { userId: Id<"users">; planId?: Id<"plans">; date: string }
+    context: { userId: Id<"users">; date: string }
 ): Promise<ChatResponse> {
     const dataChanges: ChatResponse["dataChanges"] = [];
 
@@ -260,7 +258,7 @@ async function executeIntent(
                             e.exercise?.bodyPart?.toLowerCase() === intent.params.bodyPart.toLowerCase())
                 );
 
-                if (!exerciseToReplace || !context.planId) {
+                if (!exerciseToReplace) {
                     return {
                         success: false,
                         message: `Could not find exercise "${intent.params.exerciseName}" in today's workout.`,
@@ -268,12 +266,97 @@ async function executeIntent(
                     };
                 }
 
-                // Regenerate exercise
+                // RAG: Determine target body part
+                let targetBodyPart: string | undefined = intent.params.bodyPart;
+                if (!targetBodyPart && exerciseToReplace.exercise?.bodyPart) {
+                    targetBodyPart = exerciseToReplace.exercise.bodyPart;
+                }
+
+                let preferredExerciseId: Id<"exercises"> | undefined;
+
+                // RAG: Retrieve exercise context and get AI suggestion
+                if (targetBodyPart) {
+                    try {
+                        // Get exercise context (limit to 5-10 exercises)
+                        const exerciseContext = await ctx.runQuery(api.plans.getExerciseContextForRAG, {
+                            bodyPart: targetBodyPart,
+                        });
+
+                        // Limit to 5-10 exercises
+                        const limitedExercises = exerciseContext.slice(0, 10);
+
+                        if (limitedExercises.length > 0) {
+                            // Get training goal if available
+                            const trainingStrategy = await ctx.runQuery(api.plans.getTrainingStrategyContextForRAG, {
+                                userId: context.userId,
+                            });
+                            const trainingGoal = trainingStrategy?.goal || "";
+
+                            // Construct prompt with retrieved exercises
+                            const currentExerciseName = exerciseToReplace.exercise?.name || "the exercise";
+                            const exerciseList = limitedExercises
+                                .map((e: { name: string; equipment?: string; isCompound: boolean }) => `- ${e.name}${e.equipment ? ` (${e.equipment})` : ""}${e.isCompound ? " [compound]" : ""}`)
+                                .join("\n");
+
+                            const ragPrompt = `You are helping a user swap an exercise in their workout.
+
+Current exercise: ${currentExerciseName}
+Target body part: ${targetBodyPart}
+${trainingGoal ? `User's training goal: ${trainingGoal}` : ""}
+
+Available alternatives:
+${exerciseList}
+
+Choose ONE suitable replacement from the list above that matches the body part and aligns with the user's goal.
+
+Return JSON only:
+{ "replacementExerciseName": string }
+
+The replacementExerciseName must match one of the exercise names from the list above exactly.`;
+
+                            // Call LLM to get suggestion
+                            const llmResponse = await generateText({
+                                messages: [
+                                    { role: "user", content: ragPrompt },
+                                ],
+                                modelRole: "intent",
+                            });
+
+                            // Parse JSON response
+                            let jsonText = llmResponse.trim();
+                            jsonText = jsonText.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
+
+                            const parsed = JSON.parse(jsonText);
+                            const replacementExerciseName = parsed.replacementExerciseName;
+
+                            if (replacementExerciseName && typeof replacementExerciseName === "string") {
+                                // Validate that replacementExerciseName matches one of the retrieved exercises
+                                const matchedExercise = limitedExercises.find(
+                                    (e: { name: string }) => e.name.toLowerCase() === replacementExerciseName.toLowerCase()
+                                );
+
+                                if (matchedExercise) {
+                                    preferredExerciseId = matchedExercise._id;
+                                    console.log("[RAG] Validated exercise suggestion:", replacementExerciseName);
+                                } else {
+                                    console.log("[RAG] Validation failed: exercise not in retrieved list, falling back to default behavior");
+                                }
+                            } else {
+                                console.log("[RAG] Invalid response format, falling back to default behavior");
+                            }
+                        }
+                    } catch (error) {
+                        // If RAG fails, fall back to existing behavior
+                        console.log("[RAG] Error during RAG flow, falling back to default behavior:", error);
+                    }
+                }
+
+                // Regenerate exercise (with or without preferred exercise)
                 await ctx.runAction(api.plans.regenerateExercise, {
                     exerciseSetId: exerciseToReplace._id,
                     userId: context.userId,
-                    planId: context.planId,
                     sessionId: todayWorkout._id,
+                    preferredExerciseId,
                 });
 
                 dataChanges.push({
@@ -324,30 +407,35 @@ async function executeIntent(
             }
 
             case "WORKOUT_ADD_FOCUS": {
-                if (!context.planId) {
+                // Only add to today's workout
+                const todayWorkout = await ctx.runQuery(api.workoutEditing.getTodayWorkout, {
+                    userId: context.userId,
+                    date: context.date,
+                });
+
+                if (!todayWorkout) {
                     return {
                         success: false,
-                        message: "No active plan found.",
+                        message: "No workout found for today. Generate a workout first.",
                         dataChanges: [],
                     };
                 }
 
                 await ctx.runAction(api.workoutEditing.addAccessoryExercise, {
                     userId: context.userId,
-                    planId: context.planId,
                     bodyPart: intent.params.bodyPart,
-                    count: intent.params.count || 1,
                 });
 
                 dataChanges.push({
                     type: "accessory_added",
-                    description: `Added ${intent.params.bodyPart} focus to upcoming workouts`,
+                    description: `Added ${intent.params.bodyPart} focus to today's workout`,
                 });
 
                 return {
                     success: true,
-                    message: `Added more ${intent.params.bodyPart} exercises to your upcoming workouts.`,
+                    message: `Added more ${intent.params.bodyPart} exercises to today's workout.`,
                     dataChanges,
+                    refetchIds: [todayWorkout._id],
                 };
             }
 
@@ -414,41 +502,7 @@ async function executeIntent(
                 };
             }
 
-            case "SCHEDULE_MOVE_WORKOUT": {
-                // Find workout session for fromDate
-                const workouts = await ctx.runQuery(api.plans.getWorkoutsByDateRange, {
-                    userId: context.userId,
-                    startDate: intent.params.fromDate,
-                    endDate: intent.params.fromDate,
-                });
-
-                if (!workouts || workouts.length === 0) {
-                    return {
-                        success: false,
-                        message: `No workout found for ${intent.params.fromDate}.`,
-                        dataChanges: [],
-                    };
-                }
-
-                const session = workouts[0];
-                await ctx.runMutation(api.workoutEditing.moveWorkoutSession, {
-                    sessionId: session._id,
-                    newDate: intent.params.toDate,
-                });
-
-                dataChanges.push({
-                    type: "workout_moved",
-                    description: `Moved workout from ${intent.params.fromDate} to ${intent.params.toDate}`,
-                    id: session._id,
-                });
-
-                return {
-                    success: true,
-                    message: `Moved your workout to ${new Date(intent.params.toDate).toLocaleDateString()}.`,
-                    dataChanges,
-                    refetchIds: [session._id],
-                };
-            }
+            // SCHEDULE_MOVE_WORKOUT removed - workouts cannot be moved in goal-only system
 
             case "BLOCK_ITEM": {
                 // Find item by name
@@ -528,10 +582,11 @@ async function executeIntent(
                         dataChanges: [],
                     };
                 }
+                // GENERATE_PLAN removed - use goal creation instead
                 if (originalIntent === "GENERATE_PLAN") {
                     return {
                         success: false,
-                        message: "You can generate a new plan from the Generate Program page.",
+                        message: "You can create a goal from your profile page.",
                         dataChanges: [],
                     };
                 }
@@ -603,21 +658,27 @@ export const chatCommand = action({
         date: v.string(),
     },
     handler: async (ctx, args): Promise<ChatResponse> => {
-        // Get active plan
-        const activePlan = await ctx.runQuery(api.plans.getActivePlan, {
-            userId: args.userId,
-        });
+        // Validate that date is today (only today's workout can be edited)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().split("T")[0];
+
+        if (args.date !== todayStr) {
+            return {
+                success: false,
+                message: "I can only help you modify today's workout. Past workouts are immutable.",
+                dataChanges: [],
+            };
+        }
 
         const context = {
             userId: args.userId,
-            planId: activePlan?._id,
             date: args.date,
         };
 
         // Parse intent using LLM
         const intent = await parseIntent(args.message, {
             date: args.date,
-            activePlanId: activePlan?._id,
         });
 
         // [TEST LOG] Confidence check

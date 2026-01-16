@@ -1,369 +1,587 @@
-# Workout Assistant - Architecture & Structure
+# Workout Assistant - Architecture Documentation
 
 ## Overview
-AI-powered workout planner and tracker built with Next.js, Convex, and Clerk authentication. The app helps users create personalized fitness plans, track workouts and nutrition, and monitor progress.
 
-## Tech Stack
-- **Frontend**: Next.js 14+ (App Router), React, TypeScript
-- **Backend**: Convex (serverless backend)
-- **Authentication**: Clerk
-- **Styling**: Tailwind CSS, shadcn/ui components
-- **AI**: Google Gemini (for plan generation)
+This is a constraint-driven, goal-aware fitness app that uses code to compute all rules, math, and progression, while AI only selects exercises/meals and formats output. The system is designed to be deterministic, explainable, and safe.
 
-## Project Structure
+## Core Principles
+
+1. **Code decides rules, math, progression** - All constraints are computed by pure code functions
+2. **AI only selects and formats** - AI selects exercises/meals from allowed lists and formats JSON
+3. **All outputs validated** - Every AI output is validated against constraints before storage
+4. **Goal-driven** - The system is driven by user goals, not pre-defined plans
+
+## Current Architecture: Plan-Based System
+
+**Note:** The system currently uses a **plan-based** architecture where workouts are tied to plans. The goal is to migrate to a **goal-only** system where workouts are generated directly from goals.
+
+### Current Data Flow
 
 ```
-workout_assistant/
-├── convex/                    # Backend (Convex serverless functions)
-│   ├── _generated/           # Auto-generated Convex types
-│   ├── auth.config.ts        # Clerk authentication config
-│   ├── chat.ts               # Chat intent router and command handler
-│   ├── http.ts               # HTTP endpoints
-│   ├── mealLogs.ts           # Meal logging queries/mutations
-│   ├── plans.ts              # Plan generation, CRUD, progress tracking
-│   ├── schema.ts             # Database schema definitions
-│   ├── splits.ts             # Workout split templates
-│   ├── users.ts              # User queries
-│   └── workoutEditing.ts     # Workout session editing
-│
-├── data/                     # Static data
-│   └── exercises.json        # Exercise database
-│
-├── public/                   # Static assets
-│   ├── ai-avatar.png
-│   ├── hero-ai*.png
-│   └── screenshot-for-readme.png
-│
-├── scripts/                  # Utility scripts
-│   ├── import-exercises.ts   # Exercise import script
-│   └── README.md
-│
-├── src/
-│   ├── app/                  # Next.js App Router pages
-│   │   ├── (auth)/           # Auth routes (Clerk)
-│   │   │   ├── sign-in/
-│   │   │   └── sign-up/
-│   │   ├── admin/            # Admin pages
-│   │   │   ├── exercises/
-│   │   │   └── meals/
-│   │   ├── calendar/         # Calendar view
-│   │   ├── chat/             # AI chat interface
-│   │   ├── generate-program/ # Plan generation
-│   │   ├── home/             # Daily execution dashboard
-│   │   ├── meals/             # Nutrition tracking
-│   │   ├── profile/          # User profile & settings
-│   │   ├── progress/         # Progress tracking & analytics
-│   │   ├── test/             # Test pages
-│   │   ├── workouts/         # Workout overview
-│   │   ├── layout.tsx        # Root layout
-│   │   ├── page.tsx          # Landing page
-│   │   └── globals.css       # Global styles
-│   │
-│   ├── components/           # React components
-│   │   ├── ui/               # shadcn/ui components
-│   │   │   ├── accordion.tsx
-│   │   │   ├── button.tsx
-│   │   │   ├── card.tsx
-│   │   │   └── tabs.tsx
-│   │   ├── CornerElements.tsx
-│   │   ├── Footer.tsx
-│   │   ├── Navbar.tsx
-│   │   ├── NoFitnessPlan.tsx
-│   │   ├── ProfileHeader.tsx
-│   │   ├── TerminalOverlay.tsx
-│   │   └── UserPrograms.tsx
-│   │
-│   ├── constants/           # App constants
-│   │   └── index.js
-│   │
-│   ├── lib/                 # Utility functions
-│   │   └── utils.ts
-│   │
-│   ├── providers/           # React context providers
-│   │   └── ConvexClerkProvider.tsx
-│   │
-│   └── middleware.ts        # Next.js middleware (route protection)
-│
-├── components.json          # shadcn/ui config
-├── eslint.config.mjs       # ESLint config
-├── next.config.ts          # Next.js config
-├── package.json            # Dependencies
-├── postcss.config.mjs      # PostCSS config
-└── tsconfig.json           # TypeScript config
+User Onboarding
+  ↓
+Create Goal + User Profile
+  ↓
+Generate Plan (with trainingStrategy)
+  ↓
+Generate Workouts from Strategy (month-long)
+  ↓
+Daily Workout Generation (constraint-driven)
+  ↓
+Workout Sessions + Exercise Sets
 ```
 
-## Database Schema (Convex)
+### Target Architecture: Goal-Only System
 
-### Tables
+```
+User Onboarding
+  ↓
+Create Goal + User Profile
+  ↓
+Daily Workout Generation (constraint-driven, goal-driven)
+  ↓
+Workout Sessions + Exercise Sets
+```
 
-#### `users`
-- `name`: string
-- `email`: string
-- `avatar`: optional string
-- `clerkId`: string (indexed)
-- **Indexes**: `by_clerk_id`
+---
 
-#### `plans`
-- `userId`: Id<"users"> (indexed)
-- `name`: string
-- `workoutPlan`: object (schedule, exercises)
-- `dietPlan`: object (dailyCalories, meals)
-- `trainingStrategy`: optional object (goal_type, primary_focus, time_horizon_weeks, etc.)
-- `executionConfig`: optional object (split_type, intensity_distribution)
-- `isActive`: boolean (indexed)
-- **Indexes**: `by_user_id`, `by_active`
+## File Structure & Responsibilities
 
-#### `exercises`
-- `name`: string
-- `bodyPart`: string (indexed)
-- `isCompound`: boolean (indexed)
-- `equipment`: optional string
-- `instructions`: optional array<string>
-- **Indexes**: `by_body_part`, `by_compound`
+### Backend Files (`convex/`)
 
-#### `meals`
-- `name`: string (indexed)
-- `foods`: array<string>
-- `calories`: number
-- `instructions`: array<string>
-- `mealType`: optional array<string>
-- **Indexes**: `by_name`
+#### Core System Files
 
-#### `workout_sessions`
-- `userId`: Id<"users"> (indexed)
-- `planId`: Id<"plans"> (indexed)
-- `date`: string (indexed, YYYY-MM-DD)
-- `weekNumber`: number
-- `dayOfWeek`: string
-- `intensity`: string
-- **Indexes**: `by_user_id`, `by_plan_id`, `by_date`
+**`schema.ts`**
+- **Purpose:** Defines all database tables and their schemas
+- **Key Tables:**
+  - `users` - User profiles (height, weight, experience, injuries, preferences)
+  - `goals` - User fitness goals (category, target, direction, value, unit, isActive)
+  - `plans` - Training plans (workoutPlan, dietPlan, trainingStrategy, executionConfig) - **TO BE REMOVED**
+  - `exercises` - Exercise database (name, bodyPart, isCompound, equipment)
+  - `meals` - Meal database (name, foods, calories, instructions, mealType)
+  - `workout_sessions` - Daily workout sessions (userId, planId, date, intensity) - **planId TO BE REMOVED**
+  - `exercise_sets` - Individual exercise sets (sessionId, exerciseId, plannedWeight, plannedReps, actualWeight, actualReps)
+  - `daily_meals` - Daily meal assignments (sessionId, mealId, mealType)
+  - `blocked_items` - User-blocked exercises/meals
+  - `meal_logs` - User meal logging
+  - `daily_tracking` - Water intake and steps
+  - `challenges` - Pushup/pullup challenges
 
-#### `exercise_sets`
-- `sessionId`: Id<"workout_sessions"> (indexed)
-- `exerciseId`: Id<"exercises"> (indexed)
-- `plannedWeight`: number
-- `plannedReps`: number
-- `actualWeight`: optional number
-- `actualReps`: optional number
-- `actualRPE`: optional number
-- `completed`: boolean
-- `setNumber`: number
-- **Indexes**: `by_session_id`, `by_exercise_id`
+**`constraints.ts`** ⭐ **CORE FILE**
+- **Purpose:** Pure code functions that compute workout and nutrition constraints (NO AI)
+- **Key Functions:**
+  - `computeWorkoutIntent()` - Determines body parts, intensity, sets, rep ranges based on goal + recent workouts
+  - `computeProgressionTargets()` - Calculates exact weights/reps from workout history
+  - `computeNutritionIntent()` - Computes calorie targets, protein minimums, carb bias
+- **Dependencies:** None (pure functions)
+- **Used By:** `constrainedGeneration.ts`, `plans.ts`
 
-#### `daily_meals`
-- `sessionId`: Id<"workout_sessions"> (indexed)
-- `mealId`: Id<"meals"> (indexed)
-- `mealType`: string
-- `completed`: boolean
-- `order`: number
-- **Indexes**: `by_session_id`, `by_meal_id`
+**`constrainedGeneration.ts`** ⭐ **CORE FILE**
+- **Purpose:** AI functions that generate workouts/meals, strictly constrained by computed values
+- **Key Functions:**
+  - `generateDailyWorkout()` - AI selects exercises, uses EXACT weights from progression targets
+  - `generateDailyMeals()` - AI selects meals, matches EXACT calorie targets
+- **Dependencies:** `constraints.ts`, `llm.ts`, retrieval functions
+- **Used By:** `plans.ts` (via `generateDailyWorkoutAndMeals`)
 
-#### `blocked_items`
-- `userId`: Id<"users"> (indexed)
-- `itemType`: "exercise" | "meal"
-- `itemId`: string
-- `itemName`: string
-- **Indexes**: `by_user_id`, `by_item` (itemType, itemId)
+**`validation.ts`**
+- **Purpose:** Validates AI outputs against constraints
+- **Key Functions:**
+  - `validateWorkoutBlueprint()` - Ensures weights/sets match constraints
+  - `validateMealPlan()` - Ensures calories/protein match targets
+  - `checkBlockedItems()` - Checks for blocked exercises/meals
+- **Dependencies:** `constrainedGeneration.ts`, `constraints.ts`
+- **Used By:** `plans.ts`
 
-#### `meal_logs`
-- `userId`: Id<"users"> (indexed)
-- `date`: string (indexed, YYYY-MM-DD)
-- `name`: string
-- `calories`: number
-- `protein`: optional number
-- `mealType`: optional string
-- **Indexes**: `by_user_id`, `by_date`, `by_user_and_date`
+**`goals.ts`**
+- **Purpose:** CRUD operations for goals
+- **Key Functions:**
+  - `getUserGoals()` - Get all goals for a user
+  - `getActiveGoal()` - Get active goal for a user
+  - `createGoal()` - Create new goal (sets as active, deactivates others)
+  - `updateGoal()` - Update goal fields
+  - `deleteGoal()` - Delete a goal
+  - `setActiveGoal()` - Set a goal as active
+- **Dependencies:** None
+- **Used By:** Frontend, `plans.ts`, `constraints.ts`
 
-## Key Backend Functions (Convex)
+#### Plan Management (TO BE REFACTORED)
 
-### `convex/plans.ts`
-- `createPlan` - Create new fitness plan
-- `generatePlan` - AI-powered plan generation
-- `getActivePlan` - Get user's active plan
-- `getWorkoutsByDateRange` - Get workouts for date range
-- `calculateProgressionForExercise` - Calculate weight progression
-- `createExerciseSet` - Create exercise set
-- `updateExerciseSet` - Update set with actual values
-- `getExerciseProgress` - Get progress for specific exercise
-- `getAllExerciseProgress` - Get progress for all exercises
-- `getBodyPartStrength` - Analyze body part strength
-- `regenerateExercise` - Replace exercise in workout
-- `regenerateMeal` - Replace meal in plan
-- `blockItem` - Block exercise or meal
-- `createMeal` - Create meal
-- `getAllMeals` - Get all meals
-- `createDailyMeal` - Assign meal to session
+**`plans.ts`** ⚠️ **LARGE FILE - NEEDS REFACTORING**
+- **Purpose:** Plan management, workout generation, and daily workout/meal generation
+- **Current Structure:**
+  1. **Plan CRUD** (lines ~36-500)
+     - `getUserPlans()`, `getActivePlan()`, `createPlan()`, `deletePlan()`, etc.
+     - **Status:** These will be removed in goal-only system
+  2. **Plan Generation** (lines ~537-777)
+     - `generatePlan()` - Creates plan with trainingStrategy and dietPlan
+     - **Status:** Will be replaced with goal-based generation
+  3. **Workout Generation from Strategy** (lines ~1085-1438)
+     - `generateWorkoutsFromStrategy()` - Generates month-long workouts from plan strategy
+     - `generateNextWorkout()` - Generates next workout after completion
+     - **Status:** Will be replaced with goal-based daily generation
+  4. **Constraint-Driven Generation** (lines ~3802-4047) ⭐ **KEEP THIS**
+     - `generateDailyWorkoutAndMeals()` - Main entry point for daily generation
+     - Uses `constraints.ts`, `constrainedGeneration.ts`, `validation.ts`
+     - **Status:** This is the future - goal-driven, no plan dependency
+- **Dependencies:** `constraints.ts`, `constrainedGeneration.ts`, `validation.ts`, `goals.ts`, `users.ts`
+- **Used By:** Frontend, other backend files
 
-### `convex/workoutEditing.ts`
-- `getTodayWorkout` - Get today's workout
-- `reduceWorkoutVolume` - Remove sets/exercises
-- `addAccessoryExercise` - Add exercise to upcoming sessions
-- `moveWorkoutSession` - Reschedule workout
-- `getUpcomingWorkouts` - Get next 7 days
-- `getWorkoutHistory` - Get last 14 days
+**`splits.ts`**
+- **Purpose:** Workout split templates (PPL, Upper/Lower, Full Body, etc.)
+- **Key Functions:**
+  - `getSplitTemplate()` - Returns split template for a given split type
+- **Dependencies:** None
+- **Used By:** `plans.ts` (for plan-based generation)
+- **Status:** May still be useful for goal-based generation (user preferences)
 
-### `convex/mealLogs.ts`
-- `getMealLogsByDate` - Get logs for specific date
-- `getMealLogsByDateRange` - Get logs for date range
-- `createMealLog` - Create meal log
-- `updateMealLog` - Update meal log
-- `deleteMealLog` - Delete meal log
+#### User Management
 
-### `convex/chat.ts`
-- `chatCommand` - Intent router for chat commands
-- Supports intents: WORKOUT_SWAP_EXERCISE, WORKOUT_MAKE_EASIER, WORKOUT_ADD_FOCUS, MEAL_SUGGEST, MEAL_LOG_QUICK, SCHEDULE_MOVE_WORKOUT, BLOCK_ITEM
+**`users.ts`**
+- **Purpose:** User CRUD and profile management
+- **Key Functions:**
+  - `syncUser()` - Syncs Clerk user to Convex
+  - `getUserByClerkId()` - Get user by Clerk ID
+  - `getUserById()` - Get user by Convex ID
+  - `updateProfile()` - Update user profile (height, weight, experience, injuries, preferences)
+- **Dependencies:** None
+- **Used By:** Frontend, `plans.ts`, `constraints.ts`
 
-### `convex/users.ts`
-- `getUserByClerkId` - Get user by Clerk ID
+#### AI & LLM
 
-## Frontend Pages
+**`llm.ts`**
+- **Purpose:** LLM wrapper for Google Gemini
+- **Key Functions:**
+  - `generateText()` - Generates text using Gemini with messages and optional model role
+- **Dependencies:** Google Generative AI SDK
+- **Used By:** `constrainedGeneration.ts`, `plans.ts` (for plan generation)
 
-### `/` (Landing)
-- Marketing page for non-authenticated users
-- Redirects authenticated users to `/home`
+**`src/ai/retrieval/getExerciseContext.ts`**
+- **Purpose:** Retrieves exercise context for AI generation
+- **Key Functions:**
+  - `getExerciseContext()` - Gets exercises with optional filters (name, bodyPart)
+- **Dependencies:** Convex QueryCtx
+- **Used By:** `constrainedGeneration.ts`, `plans.ts`
 
-### `/home` (Daily Dashboard)
-- Today's workout with quick complete functionality
-- Today's nutrition (targets vs actual)
-- Quick meal logging
-- Weekly stats
+**`src/ai/retrieval/getMealContext.ts`**
+- **Purpose:** Retrieves meal context for AI generation
+- **Key Functions:**
+  - `getMealContext()` - Gets meals with optional filters (mealType, calories)
+- **Dependencies:** Convex QueryCtx
+- **Used By:** `constrainedGeneration.ts`, `plans.ts`
 
-### `/workouts`
-- Current focus from training strategy
-- Upcoming workouts (next 7 days)
-- Workout history (last 14 days)
-- Session detail view with editing
+**`src/ai/retrieval/getTrainingStrategyContext.ts`**
+- **Purpose:** Retrieves training strategy from active plan
+- **Key Functions:**
+  - `getTrainingStrategyContext()` - Gets training strategy from active plan
+- **Dependencies:** Convex QueryCtx
+- **Used By:** Chat system, other AI features
+- **Status:** Will need to be refactored for goal-only system
 
-### `/meals`
-- Daily calorie and protein targets
-- Today's planned and logged meals
-- Suggested meals with assign functionality
-- Weekly calorie trend chart
+#### Other Features
 
-### `/progress`
-- Goal progress tracking
-- Exercise progress charts (weight, volume over time)
-- Body part strength visualization
-- Future projections
-- Top exercises summary
+**`workoutEditing.ts`**
+- **Purpose:** Workout session editing and regeneration
+- **Key Functions:**
+  - `reduceWorkoutVolume()` - Makes workout easier/shorter
+  - `regenerateExercise()` - Regenerates a single exercise
+  - `getTodayWorkout()` - Gets today's workout
+  - `getWorkoutHistory()` - Gets workout history
+- **Dependencies:** `plans.ts`
+- **Used By:** Frontend
 
-### `/calendar`
-- Month view of workouts and meals
-- Reschedule support (move workouts)
-- Combined workout + meals view
+**`dailyTracking.ts`**
+- **Purpose:** Daily tracking (water, steps)
+- **Key Functions:**
+  - `getDailyTracking()`, `updateDailyTracking()`, `addWaterIntake()`, `updateSteps()`
+- **Dependencies:** None
+- **Used By:** Frontend
 
-### `/chat`
-- AI chat interface
-- Natural language command processing
-- Intent router with deterministic parsing
-- Shows data changes made
+**`mealLogs.ts`**
+- **Purpose:** Meal logging
+- **Key Functions:**
+  - `getMealLogs()`, `addMealLog()`, `deleteMealLog()`
+- **Dependencies:** None
+- **Used By:** Frontend
 
-### `/profile`
-- User stats and preferences
-- Goal, injuries, equipment, diet preferences
-- Active plan selection
-- Split change functionality
-- Plan management
+**`challenges.ts`**
+- **Purpose:** Pushup/pullup challenges
+- **Key Functions:**
+  - `createChallenge()`, `updateChallenge()`, `logChallengeReps()`
+- **Dependencies:** None
+- **Used By:** Frontend
 
-### `/generate-program`
-- Plan generation form
-- User input collection
-- AI-powered plan creation
+**`chat.ts`**
+- **Purpose:** AI chat interface for workout assistance
+- **Key Functions:**
+  - Chat intent routing and command handling
+- **Dependencies:** `llm.ts`, `plans.ts`, retrieval functions
+- **Used By:** Frontend
 
-### `/admin/exercises` & `/admin/meals`
-- Admin pages for managing exercises and meals
+**`http.ts`**
+- **Purpose:** HTTP endpoints (webhooks, etc.)
+- **Dependencies:** Various
+- **Used By:** External services
 
-## Components
+**`auth.config.ts`**
+- **Purpose:** Clerk authentication configuration
+- **Dependencies:** Clerk
+- **Used By:** Convex auth system
 
-### Layout Components
-- `Navbar` - Main navigation (Home, Workouts, Progress, Meals, Calendar, Chat, Profile)
-- `Footer` - Footer component
-- `CornerElements` - Decorative corner elements
+### Frontend Files (`src/app/`)
 
-### UI Components (shadcn/ui)
-- `Button` - Button component
-- `Card` - Card container
-- `Accordion` - Collapsible content
-- `Tabs` - Tab navigation
+**`page.tsx`** (Landing Page)
+- **Purpose:** Public landing page
+- **Features:** Hero section, call-to-action
 
-### Feature Components
-- `NoFitnessPlan` - Empty state for no plan
-- `ProfileHeader` - Profile header display
-- `TerminalOverlay` - Terminal-style overlay
-- `UserPrograms` - User's program list
+**`home/page.tsx`** ⭐ **MAIN DASHBOARD**
+- **Purpose:** Daily workout execution dashboard
+- **Features:**
+  - Shows today's workout if exists
+  - Shows "Get Started" button if no active plan
+  - Displays workout sessions, exercise sets, meals
+- **Dependencies:** `plans.ts`, `workoutEditing.ts`
+- **Status:** Needs update for goal-only system
 
-## Routing & Authentication
+**`generate-program/page.tsx`** ⭐ **ONBOARDING**
+- **Purpose:** Onboarding flow that collects user info and creates goal + plan
+- **Features:**
+  - Conversation-style UI
+  - Collects: age, height, weight, fitness goal, experience, workout days, injuries, dietary preferences
+  - Calls `generatePlan()` which creates goal + plan + generates workouts
+- **Dependencies:** `plans.ts` (generatePlan action)
+- **Status:** Needs update to create goal only, not plan
 
-### Protected Routes
-Protected by middleware (`src/middleware.ts`):
-- `/home`
-- `/workouts`
-- `/meals`
-- `/calendar`
-- `/chat`
-- `/profile`
-- `/progress`
+**`profile/page.tsx`**
+- **Purpose:** User profile and settings
+- **Features:**
+  - Goal management (create, edit, delete goals)
+  - Plan management (view, activate, delete plans)
+  - User profile editing
+- **Dependencies:** `goals.ts`, `plans.ts`, `users.ts`
+- **Status:** Needs update to remove plan management
 
-### Public Routes
-- `/` (landing)
-- `/sign-in`
-- `/sign-up`
-- `/generate-program`
+**`workouts/page.tsx`**
+- **Purpose:** Workout overview/history
+- **Dependencies:** `plans.ts`, `workoutEditing.ts`
 
-## Key Features
+**`meals/page.tsx`**
+- **Purpose:** Meal planning and logging
+- **Dependencies:** `plans.ts`, `mealLogs.ts`
 
-### Plan Generation
-- AI-powered plan creation using Google Gemini
-- Considers user goals, injuries, equipment, diet preferences
-- Generates workout plan and meal plan
-- Creates training strategy with priorities
+**`progress/page.tsx`**
+- **Purpose:** Progress tracking and analytics
+- **Dependencies:** `plans.ts` (for exercise progress)
 
-### Workout Tracking
-- Planned vs actual weight/reps tracking
-- Set completion tracking
-- RPE (Rate of Perceived Exertion) tracking
-- Volume reduction (make easier/shorter)
-- Exercise swapping
-- Accessory exercise addition
+**`calendar/page.tsx`**
+- **Purpose:** Calendar view of workouts
+- **Dependencies:** `plans.ts`
 
-### Nutrition Tracking
-- Daily calorie and protein targets
-- Planned meals from plan
-- Manual meal logging
-- Weekly calorie trends
-- Meal suggestions
+**`chat/page.tsx`**
+- **Purpose:** AI chat interface
+- **Dependencies:** `chat.ts`
 
-### Progress Analytics
-- Exercise progress over time
-- Body part strength analysis
-- Goal progress tracking
-- Future weight projections
-- Top exercises summary
+**`admin/exercises/page.tsx`** & **`admin/meals/page.tsx`**
+- **Purpose:** Admin pages for managing exercise and meal databases
+- **Dependencies:** Direct database access
 
-### Chat Interface
-- Natural language commands
-- Deterministic intent parsing
-- Supports workout modifications, meal logging, scheduling
+---
 
-## Data Flow
+## Current Workflow: Plan-Based System
 
-1. **User Authentication**: Clerk handles auth, Convex stores user records
-2. **Plan Creation**: User inputs → AI generation → Plan stored in Convex
-3. **Workout Execution**: Plan → Sessions → Sets → User completes → Actual values stored
-4. **Progress Tracking**: Completed sets → Progress queries → Analytics displayed
-5. **Nutrition**: Plan meals + manual logs → Daily totals → Progress tracking
+### 1. Onboarding Flow
 
-## Environment Setup
+```
+User clicks "Get Started"
+  ↓
+generate-program/page.tsx
+  ↓
+Conversation collects:
+  - Age, Height, Weight
+  - Fitness Goal
+  - Experience Level
+  - Workout Frequency
+  - Injuries
+  - Dietary Preferences
+  ↓
+plans.ts::generatePlan()
+  ├─ Saves user profile (height, weight, experience, injuries, preferences)
+  ├─ Creates goal (from fitness goal)
+  ├─ Generates trainingStrategy (AI)
+  ├─ Generates dietPlan (AI)
+  ├─ Creates plan with strategy + diet
+  └─ Calls generateWorkoutsFromStrategy() to generate month of workouts
+  ↓
+User redirected to home page
+```
 
-Required environment variables:
-- `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk publishable key
-- `CLERK_SECRET_KEY` - Clerk secret key
-- `CONVEX_DEPLOY_KEY` - Convex deploy key
-- `GOOGLE_GENERATIVE_AI_API_KEY` - Google Gemini API key
+### 2. Daily Workout Generation (Current: Plan-Based)
 
-## Development
+```
+User requests daily workout
+  ↓
+plans.ts::generateDailyWorkoutAndMeals()
+  ├─ Gets active plan (required)
+  ├─ Gets active goal
+  ├─ Gets user profile
+  ├─ Gets recent workouts (14 days)
+  ├─ Computes workout intent (constraints.ts)
+  ├─ Computes progression targets (constraints.ts)
+  ├─ Generates workout (constrainedGeneration.ts)
+  ├─ Validates workout (validation.ts)
+  ├─ Computes nutrition intent (constraints.ts)
+  ├─ Generates meals (constrainedGeneration.ts)
+  ├─ Validates meals (validation.ts)
+  └─ Creates workout session + exercise sets + daily meals
+```
 
-- Frontend: `npm run dev` (Next.js dev server)
-- Backend: Convex automatically syncs on file changes
-- Type generation: Convex auto-generates types in `convex/_generated/`
+### 3. Next Workout Generation (After Completion)
+
+```
+User completes workout
+  ↓
+plans.ts::generateNextWorkout()
+  ├─ Gets plan and training strategy
+  ├─ Finds next session in weekly split
+  ├─ Selects exercises based on body parts
+  ├─ Calculates progression
+  └─ Creates workout session + exercise sets
+```
+
+---
+
+## Target Workflow: Goal-Only System
+
+### 1. Onboarding Flow (Simplified)
+
+```
+User clicks "Get Started"
+  ↓
+generate-program/page.tsx (rename to onboarding?)
+  ↓
+Conversation collects:
+  - Age, Height, Weight
+  - Fitness Goal
+  - Experience Level
+  - Workout Frequency (for split preference)
+  - Injuries
+  - Dietary Preferences
+  ↓
+NEW: goals.ts::createGoal() + users.ts::updateProfile()
+  ├─ Saves user profile
+  └─ Creates goal
+  ↓
+User redirected to home page
+```
+
+### 2. Daily Workout Generation (Goal-Based)
+
+```
+User requests daily workout
+  ↓
+plans.ts::generateDailyWorkoutAndMeals() (refactored)
+  ├─ Gets active goal (required, no plan needed)
+  ├─ Gets user profile
+  ├─ Gets recent workouts (14 days)
+  ├─ Computes workout intent from goal (constraints.ts)
+  ├─ Computes progression targets (constraints.ts)
+  ├─ Generates workout (constrainedGeneration.ts)
+  ├─ Validates workout (validation.ts)
+  ├─ Computes nutrition intent from goal (constraints.ts)
+  ├─ Generates meals (constrainedGeneration.ts)
+  ├─ Validates meals (validation.ts)
+  └─ Creates workout session + exercise sets + daily meals
+    (session no longer needs planId)
+```
+
+### 3. Next Workout Generation (After Completion)
+
+```
+User completes workout
+  ↓
+NEW: goals.ts::generateNextWorkout() or plans.ts::generateNextWorkout() (refactored)
+  ├─ Gets active goal (no plan needed)
+  ├─ Gets user profile + preferences (split preference)
+  ├─ Computes workout intent from goal
+  ├─ Selects exercises based on goal + body part rotation
+  ├─ Calculates progression from history
+  └─ Creates workout session + exercise sets
+```
+
+---
+
+## Migration Plan: Plan → Goal-Only
+
+### Phase 1: Schema Changes
+
+1. **Remove `planId` from `workout_sessions`**
+   - Add migration to set planId to null or remove field
+   - Update all queries that filter by planId
+
+2. **Keep `plans` table temporarily** (for data migration)
+   - Mark as deprecated
+   - Eventually remove after migration
+
+3. **Enhance `goals` table if needed**
+   - Add `preferred_split` field?
+   - Add `workout_frequency` field?
+
+### Phase 2: Backend Refactoring
+
+1. **Refactor `generateDailyWorkoutAndMeals()`**
+   - Remove `activePlan` requirement
+   - Use `activeGoal` + `userProfile` instead
+   - Remove planId from workout session creation
+
+2. **Refactor `generateNextWorkout()`**
+   - Remove plan dependency
+   - Use goal + user preferences for split selection
+   - Compute workout intent from goal directly
+
+3. **Remove plan generation functions**
+   - `generatePlan()` - Replace with goal creation
+   - `generateWorkoutsFromStrategy()` - No longer needed
+   - Plan CRUD functions - Remove or deprecate
+
+4. **Update constraint computation**
+   - `computeWorkoutIntent()` - Already uses goal, just remove plan fallback
+   - `computeNutritionIntent()` - Already uses goal, no changes needed
+
+### Phase 3: Frontend Updates
+
+1. **Update onboarding**
+   - Remove plan creation
+   - Only create goal + update profile
+
+2. **Update home page**
+   - Remove "active plan" checks
+   - Check for "active goal" instead
+
+3. **Update profile page**
+   - Remove plan management UI
+   - Keep goal management
+
+4. **Update other pages**
+   - Remove plan references
+   - Use goal-based logic
+
+### Phase 4: Data Migration
+
+1. **Migrate existing plans to goals**
+   - Extract goal from plan's trainingStrategy
+   - Create goal from plan data
+   - Link workout sessions to goals (or remove planId)
+
+2. **Clean up**
+   - Remove plan data after migration
+   - Remove plan-related code
+
+---
+
+## Key Dependencies
+
+### Constraint System (Core)
+```
+constraints.ts (pure code)
+  ↓
+constrainedGeneration.ts (AI, constrained)
+  ↓
+validation.ts (validation)
+  ↓
+plans.ts::generateDailyWorkoutAndMeals() (orchestration)
+```
+
+### Goal System
+```
+goals.ts (CRUD)
+  ↓
+constraints.ts::computeWorkoutIntent() (uses goal)
+  ↓
+constrainedGeneration.ts (uses workout intent)
+```
+
+### User System
+```
+users.ts (CRUD)
+  ↓
+constraints.ts::computeNutritionIntent() (uses user profile)
+  ↓
+constrainedGeneration.ts (uses nutrition intent)
+```
+
+---
+
+## Important Notes
+
+1. **Constraint-driven system is goal-agnostic**
+   - `constraints.ts` already uses goals, not plans
+   - `constrainedGeneration.ts` is already goal-agnostic
+   - Main work is removing plan dependencies from orchestration
+
+2. **Workout sessions currently require planId**
+   - This is the main blocker
+   - Need to make planId optional or remove it
+
+3. **Training strategy is currently in plans**
+   - This can be derived from goal + user preferences
+   - Or stored in goal/user preferences
+
+4. **Split selection currently uses plan's executionConfig**
+   - Can use user preferences instead
+   - Or compute from goal + workout frequency
+
+5. **Diet plan is currently in plans**
+   - Can be generated on-demand from goal + user profile
+   - Or stored in user preferences
+
+---
+
+## Files to Modify for Goal-Only System
+
+### High Priority
+- `convex/plans.ts` - Remove plan dependencies, refactor to goal-based
+- `convex/schema.ts` - Remove planId from workout_sessions, deprecate plans table
+- `src/app/home/page.tsx` - Check for goal instead of plan
+- `src/app/generate-program/page.tsx` - Create goal only, not plan
+
+### Medium Priority
+- `src/app/profile/page.tsx` - Remove plan management UI
+- `convex/workoutEditing.ts` - Remove plan dependencies
+- `src/app/workouts/page.tsx` - Remove plan references
+- `src/app/calendar/page.tsx` - Remove plan references
+- `src/app/progress/page.tsx` - Remove plan references
+
+### Low Priority
+- `convex/chat.ts` - Update to use goals instead of plans
+- `src/ai/retrieval/getTrainingStrategyContext.ts` - Refactor or remove
+- `convex/splits.ts` - May still be useful for user preferences
+
+---
+
+## Testing Strategy
+
+1. **Unit Tests**
+   - Test constraint computation functions
+   - Test validation functions
+   - Test goal CRUD operations
+
+2. **Integration Tests**
+   - Test goal-based workout generation
+   - Test goal-based meal generation
+   - Test workout session creation without planId
+
+3. **Migration Tests**
+   - Test plan → goal migration
+   - Test data integrity after migration
+
+---
+
+## Summary
+
+The system is already mostly goal-driven at the constraint level. The main work is:
+1. Removing plan dependencies from workout session creation
+2. Refactoring orchestration functions to use goals instead of plans
+3. Updating frontend to remove plan UI
+4. Migrating existing plan data to goals
+
+The constraint-driven AI generation system is already goal-agnostic and ready to work without plans.

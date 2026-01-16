@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Page } from "@/components/layout/Page";
-import { DumbbellIcon, CheckIcon, PlusIcon, ArrowUpRightIcon, PencilIcon, DropletIcon, AppleIcon, MessageSquareIcon, SendIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { DumbbellIcon, CheckIcon, PlusIcon, ArrowUpRightIcon, PencilIcon, DropletIcon, AppleIcon, MessageSquareIcon, SendIcon, ChevronDownIcon, ChevronUpIcon, TargetIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -26,8 +26,8 @@ const HomePage = () => {
         convexUser?._id ? { userId: convexUser._id, date: today } : "skip"
     );
 
-    const activePlan = useQuery(
-        api.plans.getActivePlan,
+    const activeGoal = useQuery(
+        api.goals.getActiveGoal,
         convexUser?._id ? { userId: convexUser._id } : "skip"
     );
 
@@ -49,7 +49,8 @@ const HomePage = () => {
 
     const createMealLog = useMutation(api.mealLogs.createMealLog);
     const updateExerciseSet = useMutation(api.plans.updateExerciseSet);
-    const generateTodayWorkout = useAction(api.plans.generateWorkoutsFromStrategy);
+    const generateTodayWorkout = useAction(api.plans.generateDailyWorkoutAndMeals);
+    const deleteWorkoutSession = useMutation(api.plans.deleteWorkoutSession);
     const chatCommand = useAction(api.chat.chatCommand);
 
     const [newMealLog, setNewMealLog] = useState({
@@ -66,11 +67,12 @@ const HomePage = () => {
     ]);
     const [chatInput, setChatInput] = useState("");
     const [chatLoading, setChatLoading] = useState(false);
+    const [generatingWorkout, setGeneratingWorkout] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
 
-    // Calculate nutrition stats
-    const targetCalories = activePlan?.dietPlan?.dailyCalories || 0;
+    // Calculate nutrition stats (default target calories)
+    const targetCalories = 2000; // Default, can be computed from goals later
     const loggedCalories = todayMealLogs?.reduce((sum, log) => sum + log.calories, 0) || 0;
     const plannedMealCalories = todayMeals?.[0]?.meals?.reduce((sum: number, dm: any) => {
         return sum + (dm.meal?.calories || 0);
@@ -156,14 +158,33 @@ const HomePage = () => {
     };
 
     const handleGenerateToday = async () => {
-        if (!convexUser?._id || !activePlan?._id) return;
+        if (!convexUser?._id || generatingWorkout) return;
+        if (!activeGoal) {
+            alert("Please create a goal first");
+            return;
+        }
+        setGeneratingWorkout(true);
         try {
             await generateTodayWorkout({
-                planId: activePlan._id,
                 userId: convexUser._id,
+                date: today,
             });
         } catch (error) {
-            alert("Failed to generate workout");
+            alert(`Failed to generate workout: ${error instanceof Error ? error.message : "Unknown error"}`);
+        } finally {
+            setGeneratingWorkout(false);
+        }
+    };
+
+    const handleDeleteTodayWorkout = async () => {
+        if (!todayWorkout?._id) return;
+        if (!confirm("Are you sure you want to delete today's workout? You can regenerate it with explanations.")) {
+            return;
+        }
+        try {
+            await deleteWorkoutSession({ sessionId: todayWorkout._id });
+        } catch (error) {
+            alert(`Failed to delete workout: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
     };
 
@@ -216,19 +237,21 @@ const HomePage = () => {
         );
     }
 
-    if (!activePlan) {
+    if (!activeGoal) {
         return (
             <div className="min-h-screen bg-[#0B0F14] flex items-center justify-center px-4">
                 <Card className="max-w-2xl w-full">
                     <CardContent className="pt-6">
                         <div className="text-center space-y-4">
-                            <h2 className="text-2xl font-semibold text-[#E6EAF0]">No Active Plan</h2>
+                            <h2 className="text-2xl font-semibold text-[#E6EAF0]">Welcome to Your Fitness Journey</h2>
                             <p className="text-[#9AA3B2]">
-                                Create a plan to get started with your daily workouts and meals.
+                                Let's set up your profile and create a goal to get started.
                             </p>
-                            <Button asChild className="mt-4">
-                                <Link href="/generate-program">Create Plan</Link>
-                            </Button>
+                            <div className="flex gap-3 justify-center mt-6">
+                                <Button asChild size="lg">
+                                    <Link href="/profile">Create Goal</Link>
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -437,6 +460,119 @@ const HomePage = () => {
                         </Card>
                     </motion.div>
 
+                    {/* Current Goal Card */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.45 }}
+                        className="lg:col-span-6"
+                    >
+                        <Card className="h-full">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="flex items-center gap-3 text-xl text-[#E6EAF0]">
+                                        <div className="p-2.5 bg-gradient-to-br from-[#C7F000]/20 to-[#C7F000]/10 rounded-xl">
+                                            <TargetIcon className="h-5 w-5 text-[#C7F000]" />
+                                        </div>
+                                        Current Goal
+                                    </CardTitle>
+                                    {activeGoal && (
+                                        <Link href="/profile">
+                                            <Button variant="ghost" size="sm" className="text-[#9AA3B2] hover:text-[#C7F000]">
+                                                <PencilIcon className="h-4 w-4 mr-1" />
+                                                Edit goal
+                                            </Button>
+                                        </Link>
+                                    )}
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                {activeGoal ? (
+                                    <div className="space-y-4">
+                                        <div className="p-4 rounded-xl bg-[#1B212B] border border-[#C7F000]/20">
+                                            <div className="flex items-start gap-3">
+                                                <div className="mt-0.5 w-2 h-2 rounded-full bg-[#C7F000] flex-shrink-0" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="text-sm font-semibold text-[#C7F000] uppercase tracking-wide">
+                                                            {activeGoal.category === "body_composition" && "Body Composition"}
+                                                            {activeGoal.category === "strength" && "Strength"}
+                                                            {activeGoal.category === "endurance" && "Endurance"}
+                                                            {activeGoal.category === "mobility" && "Mobility"}
+                                                            {activeGoal.category === "skill" && "Skill"}
+                                                        </span>
+                                                    </div>
+                                                    {activeGoal.category === "body_composition" && activeGoal.direction && (
+                                                        <p className="text-lg font-semibold text-[#E6EAF0] mb-1">
+                                                            {activeGoal.direction.charAt(0).toUpperCase() + activeGoal.direction.slice(1)}
+                                                            {activeGoal.value && activeGoal.unit && ` ${activeGoal.value} ${activeGoal.unit}`}
+                                                        </p>
+                                                    )}
+                                                    {activeGoal.category === "strength" && activeGoal.target?.exercise && (
+                                                        <>
+                                                            <p className="text-lg font-semibold text-[#E6EAF0] mb-1">
+                                                                {activeGoal.target.exercise}
+                                                            </p>
+                                                            {activeGoal.target.metric && (
+                                                                <p className="text-sm text-[#9AA3B2]">
+                                                                    Target: {activeGoal.value || "—"} {activeGoal.unit || activeGoal.target.metric}
+                                                                </p>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                    {activeGoal.category === "endurance" && activeGoal.target?.movement && (
+                                                        <>
+                                                            <p className="text-lg font-semibold text-[#E6EAF0] mb-1">
+                                                                {activeGoal.target.movement}
+                                                            </p>
+                                                            {activeGoal.target.metric && (
+                                                                <p className="text-sm text-[#9AA3B2]">
+                                                                    Target: {activeGoal.value || "—"} {activeGoal.unit || activeGoal.target.metric}
+                                                                </p>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                    {activeGoal.category === "mobility" && activeGoal.target?.movement && (
+                                                        <>
+                                                            <p className="text-lg font-semibold text-[#E6EAF0] mb-1">
+                                                                {activeGoal.target.movement}
+                                                            </p>
+                                                            {activeGoal.value && activeGoal.unit && (
+                                                                <p className="text-sm text-[#9AA3B2]">
+                                                                    Target: {activeGoal.value} {activeGoal.unit}
+                                                                </p>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                    {activeGoal.category === "skill" && activeGoal.target?.movement && (
+                                                        <p className="text-lg font-semibold text-[#E6EAF0]">
+                                                            {activeGoal.target.movement}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-[#6B7280] text-center">
+                                            This is what you're working toward right now
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <TargetIcon className="h-12 w-12 mx-auto mb-3 text-[#6B7280] opacity-50" />
+                                        <p className="text-sm text-[#9AA3B2] mb-1">No active goal</p>
+                                        <p className="text-xs text-[#6B7280] mb-4">Set a goal to track your progress</p>
+                                        <Link href="/profile">
+                                            <Button variant="outline" size="sm">
+                                                <PlusIcon className="h-4 w-4 mr-1" />
+                                                Create Goal
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+
                     {/* Daily Meals Card */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -467,13 +603,13 @@ const HomePage = () => {
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm text-[#9AA3B2]">Calories</span>
                                             <span className="text-lg font-semibold text-[#E6EAF0]">
-                                                {totalCalories} / {targetCalories || 2000}
+                                                {totalCalories} / {targetCalories}
                                             </span>
                                         </div>
                                         <div className="w-full h-2 bg-[#161B22] rounded-full overflow-hidden">
                                             <div
                                                 className="h-full bg-[#C7F000] rounded-full transition-all duration-500"
-                                                style={{ width: `${Math.min(100, ((totalCalories / (targetCalories || 2000)) * 100))}%` }}
+                                                style={{ width: `${Math.min(100, ((totalCalories / targetCalories) * 100))}%` }}
                                             />
                                         </div>
                                     </div>
@@ -618,6 +754,101 @@ const HomePage = () => {
                         </Card>
                     </motion.div>
 
+                    {/* Today's Plan Explanation Panel - Full Width */}
+                    {todayWorkout && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.55 }}
+                            className="lg:col-span-12"
+                        >
+                            <Card className="h-full">
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-3 text-xl text-[#E6EAF0]">
+                                            <div className="p-2 bg-gradient-to-br from-[#C7F000]/20 to-[#C7F000]/10 rounded-xl">
+                                                <TargetIcon className="h-5 w-5 text-[#C7F000]" />
+                                            </div>
+                                            Today's Plan
+                                        </CardTitle>
+                                        {(!todayWorkout.workoutExplanation || (!todayWorkout.mealExplanation && !todayMeals?.[0]?.mealExplanation)) && (
+                                            <Button
+                                                onClick={handleDeleteTodayWorkout}
+                                                size="sm"
+                                                variant="outline"
+                                                className="text-[#9AA3B2] hover:text-[#C7F000]"
+                                            >
+                                                Regenerate with Explanations
+                                            </Button>
+                                        )}
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        {todayWorkout.workoutExplanation ? (
+                                            <div className="p-5 rounded-xl bg-[#1B212B] border border-[#C7F000]/20">
+                                                <div className="flex items-start gap-3 mb-2">
+                                                    <DumbbellIcon className="h-5 w-5 text-[#C7F000] flex-shrink-0 mt-0.5" />
+                                                    <div className="flex-1">
+                                                        <h3 className="text-sm font-semibold text-[#C7F000] mb-2 uppercase tracking-wide">
+                                                            Workout Strategy
+                                                        </h3>
+                                                        <p className="text-sm text-[#E6EAF0] leading-relaxed">
+                                                            {todayWorkout.workoutExplanation}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="p-5 rounded-xl bg-[#1B212B] border border-[#6B7280]/20">
+                                                <div className="flex items-start gap-3 mb-2">
+                                                    <DumbbellIcon className="h-5 w-5 text-[#6B7280] flex-shrink-0 mt-0.5" />
+                                                    <div className="flex-1">
+                                                        <h3 className="text-sm font-semibold text-[#6B7280] mb-2 uppercase tracking-wide">
+                                                            Workout Strategy
+                                                        </h3>
+                                                        <p className="text-sm text-[#9AA3B2] leading-relaxed">
+                                                            Generate a new workout to see the strategy explanation.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {(todayWorkout.mealExplanation || todayMeals?.[0]?.mealExplanation) ? (
+                                            <div className="p-5 rounded-xl bg-[#1B212B] border border-[#C7F000]/20">
+                                                <div className="flex items-start gap-3 mb-2">
+                                                    <AppleIcon className="h-5 w-5 text-[#C7F000] flex-shrink-0 mt-0.5" />
+                                                    <div className="flex-1">
+                                                        <h3 className="text-sm font-semibold text-[#C7F000] mb-2 uppercase tracking-wide">
+                                                            Nutrition Strategy
+                                                        </h3>
+                                                        <p className="text-sm text-[#E6EAF0] leading-relaxed">
+                                                            {todayWorkout.mealExplanation || todayMeals?.[0]?.mealExplanation}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="p-5 rounded-xl bg-[#1B212B] border border-[#6B7280]/20">
+                                                <div className="flex items-start gap-3 mb-2">
+                                                    <AppleIcon className="h-5 w-5 text-[#6B7280] flex-shrink-0 mt-0.5" />
+                                                    <div className="flex-1">
+                                                        <h3 className="text-sm font-semibold text-[#6B7280] mb-2 uppercase tracking-wide">
+                                                            Nutrition Strategy
+                                                        </h3>
+                                                        <p className="text-sm text-[#9AA3B2] leading-relaxed">
+                                                            Generate a new workout to see the nutrition strategy explanation.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                    )}
+
                     {/* Today's Workout Card - Large Primary */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -635,8 +866,12 @@ const HomePage = () => {
                                         Today's Workout
                                     </CardTitle>
                                     {!todayWorkout && (
-                                        <Button onClick={handleGenerateToday} size="sm">
-                                            Generate Today
+                                        <Button 
+                                            onClick={handleGenerateToday} 
+                                            size="sm"
+                                            disabled={generatingWorkout}
+                                        >
+                                            {generatingWorkout ? "Generating..." : "Generate Today"}
                                         </Button>
                                     )}
                                 </div>

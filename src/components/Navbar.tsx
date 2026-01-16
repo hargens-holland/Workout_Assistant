@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const Navbar = () => {
-    const { isSignedIn } = useUser();
+    const { isSignedIn, isLoaded } = useUser();
     const pathname = usePathname();
 
     const isActive = (path: string) => pathname === path;
@@ -29,7 +29,9 @@ const Navbar = () => {
 
                     {/* NAVIGATION */}
                     <nav className="flex items-center gap-1">
-                        {isSignedIn ? (
+                        {!isLoaded ? (
+                            <div className="w-20 h-8" />
+                        ) : isSignedIn ? (
                             <>
                                 <Link
                                     href="/home"

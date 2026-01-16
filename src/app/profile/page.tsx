@@ -1,17 +1,15 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
 import ProfileHeader from "@/components/ProfileHeader";
-import NoFitnessPlan from "@/components/NoFitnessPlan";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Page } from "@/components/layout/Page";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { AppleIcon, CalendarIcon, DumbbellIcon, CheckIcon, Trash2Icon } from "lucide-react";
+import { AppleIcon, CalendarIcon, DumbbellIcon, CheckIcon, Trash2Icon, PlusIcon, PencilIcon, TargetIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 // Split types - defined locally for frontend
 type SplitType = "PPL" | "UPPER_LOWER" | "FULL_BODY" | "BRO_SPLIT" | "PUSH_PULL_LEGS_ARMS";
@@ -21,6 +19,7 @@ import {
     AccordionItem,
     AccordionTrigger,
 } from "@/components/ui/accordion";
+import { GoalForm, type Goal } from "@/components/GoalForm";
 
 const ProfilePage = () => {
     const { user } = useUser();
@@ -30,128 +29,133 @@ const ProfilePage = () => {
         user?.id ? { clerkId: user.id } : "skip"
     );
 
-    const allPlans = useQuery(
-        api.plans.getUserPlans,
+    // Plans are deprecated - removed all plan-related queries and mutations
+    
+    // Goals queries and mutations
+    const allGoals = useQuery(
+        api.goals.getUserGoals,
         convexUser?._id ? { userId: convexUser._id } : "skip"
     );
-    const [selectedPlanId, setSelectedPlanId] = useState<null | string>(null);
-
-    const activePlan = allPlans?.find((plan) => plan.isActive);
-
-    const currentPlan = selectedPlanId
-        ? allPlans?.find((plan) => plan._id === selectedPlanId)
-        : activePlan;
+    const activeGoal = useQuery(
+        api.goals.getActiveGoal,
+        convexUser?._id ? { userId: convexUser._id } : "skip"
+    );
+    const createGoal = useMutation(api.goals.createGoal);
+    const updateGoal = useMutation(api.goals.updateGoal);
+    const deleteGoal = useMutation(api.goals.deleteGoal);
+    const setActiveGoal = useMutation(api.goals.setActiveGoal);
     
-    // Extract user rules from active plan (if available)
-    // Note: In a real app, these would be stored in user profile
-    // For now, we'll show plan-based info
+    const [showGoalForm, setShowGoalForm] = useState(false);
+    const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
 
-    const addMeal = useMutation(api.plans.addMealToPlan);
-    const changePlanSplit = useAction(api.plans.changePlanSplit);
-    const splitTypes = useQuery(api.plans.getSplitTypes);
-    const setActivePlan = useMutation(api.plans.setActivePlan);
-    const deletePlan = useMutation(api.plans.deletePlan);
-    const [showAddMeal, setShowAddMeal] = useState(false);
-    const [changingSplit, setChangingSplit] = useState(false);
-    const [newMeal, setNewMeal] = useState({
-        name: "",
-        foods: "",
-        calories: 0,
-    });
+    // Plan-related handlers removed - plans are deprecated
 
-    const handleAddMeal = async () => {
-        if (!currentPlan?._id) return;
-
-        const foodsArray = newMeal.foods
-            .split(",")
-            .map((f) => f.trim())
-            .filter((f) => f.length > 0);
-
-        if (!newMeal.name || foodsArray.length === 0 || newMeal.calories <= 0) {
-            alert("Please fill in all fields: name, foods (comma-separated), and calories");
-            return;
-        }
+    const handleSaveGoal = async (goal: Goal) => {
+        if (!convexUser?._id) return;
 
         try {
-            await addMeal({
-                planId: currentPlan._id,
-                meal: {
-                    name: newMeal.name,
-                    foods: foodsArray,
-                    calories: newMeal.calories,
-                },
-            });
-            setNewMeal({ name: "", foods: "", calories: 0 });
-            setShowAddMeal(false);
+            if (editingGoalId) {
+                // Update existing goal
+                await updateGoal({
+                    goalId: editingGoalId as any,
+                    userId: convexUser._id,
+                    category: goal.category,
+                    target: goal.target,
+                    direction: goal.direction,
+                    value: goal.value,
+                    unit: goal.unit,
+                });
+            } else {
+                // Create new goal (automatically sets it as active)
+                await createGoal({
+                    userId: convexUser._id,
+                    category: goal.category,
+                    target: goal.target,
+                    direction: goal.direction,
+                    value: goal.value,
+                    unit: goal.unit,
+                });
+            }
+            setShowGoalForm(false);
+            setEditingGoalId(null);
         } catch (error) {
-            alert(error instanceof Error ? error.message : "Failed to add meal");
+            alert(error instanceof Error ? error.message : "Failed to save goal");
         }
     };
 
-    const handleSetActivePlan = async (planId: string) => {
+    const handleEditGoal = (goalId: string) => {
+        setEditingGoalId(goalId);
+        setShowGoalForm(true);
+    };
+
+    const handleDeleteGoal = async (goalId: string) => {
         if (!convexUser?._id) return;
+        if (!confirm("Are you sure you want to delete this goal?")) return;
+
         try {
-            await setActivePlan({
-                planId: planId as any,
+            await deleteGoal({
+                goalId: goalId as any,
                 userId: convexUser._id,
             });
         } catch (error) {
-            console.error("Error setting active plan:", error);
-            alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
+            alert(error instanceof Error ? error.message : "Failed to delete goal");
         }
     };
 
-    const handleDeletePlan = async (planId: string) => {
-        if (!confirm("Are you sure you want to delete this plan? This will also delete all associated workouts.")) {
-            return;
-        }
+    const handleSetActiveGoal = async (goalId: string) => {
+        if (!convexUser?._id) return;
         try {
-            await deletePlan({ planId: planId as any });
-            // If we deleted the currently selected plan, reset selection
-            if (selectedPlanId === planId) {
-                setSelectedPlanId(null);
-            }
+            await setActiveGoal({
+                goalId: goalId as any,
+                userId: convexUser._id,
+            });
         } catch (error) {
-            console.error("Error deleting plan:", error);
-            alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
+            alert(error instanceof Error ? error.message : "Failed to set active goal");
         }
     };
+
 
     return (
         <Page>
             <ProfileHeader user={user} />
 
             <div className="max-w-4xl mx-auto space-y-8">
-                {/* Rules Section */}
-                {activePlan && (
+                {/* User Profile Section */}
+                {convexUser && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Rules & Preferences</CardTitle>
+                            <CardTitle>Profile & Preferences</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
                                 <div>
-                                    <div className="text-sm font-medium text-muted-foreground mb-1">Fitness Goal</div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-1">Experience Level</div>
                                     <div className="font-semibold">
-                                        {activePlan?.trainingStrategy?.goal_type || "Not set"}
+                                        {convexUser.experience_level || "Not set"}
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-sm font-medium text-muted-foreground mb-1">Primary Focus</div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-1">Workout Days Per Week</div>
                                     <div className="font-semibold">
-                                        {activePlan?.trainingStrategy?.primary_focus || "Not set"}
+                                        {convexUser.preferences?.workout_days_per_week || "Not set"}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-1">Preferred Split</div>
+                                    <div className="font-semibold">
+                                        {convexUser.preferences?.preferred_split || "Not set"}
                                     </div>
                                 </div>
                                 <div>
                                     <div className="text-sm font-medium text-muted-foreground mb-1">Injuries / Limitations</div>
                                     <div className="font-semibold">
-                                        {activePlan?.trainingStrategy?.recovery_notes || "None specified"}
+                                        {convexUser.injury_constraints?.join(", ") || "None"}
                                     </div>
                                 </div>
                                 <div>
                                     <div className="text-sm font-medium text-muted-foreground mb-1">Dietary Preferences</div>
                                     <div className="font-semibold">
-                                        {activePlan?.dietPlan?.meals?.length ? "Custom meal plan active" : "Not set"}
+                                        {convexUser.preferences?.dietary_restrictions || "None"}
                                     </div>
                                 </div>
                             </div>
@@ -159,302 +163,180 @@ const ProfilePage = () => {
                     </Card>
                 )}
 
-                {allPlans && allPlans?.length > 0 ? (
-                    <div className="space-y-8">
-                        {/* PLAN SELECTOR */}
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <CardTitle>Your Fitness Plans</CardTitle>
-                                    <div className="text-xs text-muted-foreground">
-                                        TOTAL: {allPlans.length}
-                                    </div>
+                {/* Goals Section */}
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-primary/10 rounded-lg">
+                                    <TargetIcon className="h-5 w-5 text-primary" />
                                 </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex flex-wrap gap-2">
-                                    {allPlans.map((plan) => (
-                                        <Button
-                                            key={plan._id}
-                                            onClick={() => setSelectedPlanId(plan._id)}
-                                            variant={selectedPlanId === plan._id ? "default" : "outline"}
-                                            className={cn(
-                                                selectedPlanId === plan._id && "bg-primary text-primary-foreground"
-                                            )}
-                                        >
-                                            {plan.name}
-                                            {plan.isActive && (
-                                                <span className="ml-2 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs px-2 py-0.5 rounded">
-                                                    ACTIVE
-                                                </span>
-                                            )}
-                                        </Button>
-                                    ))}
+                                <div>
+                                    <CardTitle>Goals</CardTitle>
+                                    {allGoals && allGoals.length > 0 && (
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            {allGoals.length} {allGoals.length === 1 ? "goal" : "goals"} • {activeGoal ? "1 active" : "none active"}
+                                        </p>
+                                    )}
                                 </div>
-                            </CardContent>
-                        </Card>
-
-                        {/* PLAN DETAILS */}
-
-                        {currentPlan && (
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-primary"></div>
-                                        <CardTitle>
-                                            PLAN: <span className="text-primary">{currentPlan.name}</span>
-                                        </CardTitle>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {!currentPlan.isActive && (
-                                            <Button
-                                                onClick={() => handleSetActivePlan(currentPlan._id)}
-                                                variant="outline"
-                                                size="sm"
-                                                title="Activate this plan"
+                            </div>
+                            {!showGoalForm && (
+                                <Button
+                                    onClick={() => {
+                                        setEditingGoalId(null);
+                                        setShowGoalForm(true);
+                                    }}
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    <PlusIcon className="h-4 w-4 mr-1" />
+                                    Add Goal
+                                </Button>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {showGoalForm ? (
+                            <GoalForm
+                                goal={editingGoalId && allGoals ? allGoals.find(g => g._id === editingGoalId) : undefined}
+                                onSave={handleSaveGoal}
+                                onCancel={() => {
+                                    setShowGoalForm(false);
+                                    setEditingGoalId(null);
+                                }}
+                            />
+                        ) : (
+                            <div className="space-y-3">
+                                {allGoals && allGoals.length > 0 ? (
+                                    allGoals.map((goal) => {
+                                        const categoryLabels: Record<Goal["category"], string> = {
+                                            body_composition: "Body Composition",
+                                            strength: "Strength",
+                                            endurance: "Endurance",
+                                            mobility: "Mobility",
+                                            skill: "Skill",
+                                        };
+                                        
+                                        const isActive = goal.isActive;
+                                        
+                                        return (
+                                            <div
+                                                key={goal._id}
+                                                className={cn(
+                                                    "group flex items-start gap-4 p-4 rounded-xl border transition-all",
+                                                    isActive
+                                                        ? "bg-primary/10 border-primary/30"
+                                                        : "bg-card/50 border-border hover:bg-card/70 hover:border-primary/20"
+                                                )}
                                             >
-                                                <CheckIcon className="h-4 w-4 mr-1" />
-                                                Activate
-                                            </Button>
-                                        )}
-                                        <Button
-                                            onClick={() => handleDeletePlan(currentPlan._id)}
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
-                                            title="Delete this plan"
-                                        >
-                                            <Trash2Icon className="h-4 w-4 mr-1" />
-                                            Delete
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-
-                            <Tabs defaultValue="workout" className="w-full">
-                                <TabsList className="mb-6 w-full grid grid-cols-2">
-                                    <TabsTrigger value="workout">
-                                        <DumbbellIcon className="mr-2 size-4" />
-                                        Workout Plan
-                                    </TabsTrigger>
-
-                                    <TabsTrigger value="diet">
-                                        <AppleIcon className="mr-2 h-4 w-4" />
-                                        Diet Plan
-                                    </TabsTrigger>
-                                </TabsList>
-
-                                <TabsContent value="workout">
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
-                                            <div className="flex items-center gap-2">
-                                                <CalendarIcon className="h-4 w-4 text-primary" />
-                                                <span className="text-sm text-muted-foreground">
-                                                    Schedule: {currentPlan.workoutPlan.schedule.join(", ")}
-                                                </span>
-                                            </div>
-                                            {currentPlan.trainingStrategy && (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-muted-foreground">Split:</span>
-                                                    <select
-                                                        value={currentPlan.trainingStrategy.split_type || "FULL_BODY"}
-                                                        onChange={async (e) => {
-                                                            if (!currentPlan?._id || !convexUser?._id || !splitTypes) return;
-                                                            const newSplit = e.target.value as SplitType;
-                                                            if (newSplit === currentPlan.trainingStrategy?.split_type) return;
-
-                                                            const splitInfo = splitTypes[newSplit as keyof typeof splitTypes];
-                                                            if (!splitInfo || !confirm(`Change split to ${splitInfo.name}? This will regenerate all workouts.`)) {
-                                                                return;
-                                                            }
-
-                                                            setChangingSplit(true);
-                                                            try {
-                                                                await changePlanSplit({
-                                                                    planId: currentPlan._id,
-                                                                    userId: convexUser._id,
-                                                                    newSplitType: newSplit,
-                                                                });
-                                                            } catch (error) {
-                                                                console.error("Error changing split:", error);
-                                                                alert("Failed to change split");
-                                                            } finally {
-                                                                setChangingSplit(false);
-                                                            }
-                                                        }}
-                                                        disabled={changingSplit || !splitTypes}
-                                                        className="px-3 py-1.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                                    >
-                                                        {splitTypes && Object.entries(splitTypes).map(([key, value]) => (
-                                                            <option key={key} value={key}>
-                                                                {value.name} ({value.daysPerWeek} days/week)
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    {changingSplit && (
-                                                        <span className="text-xs text-muted-foreground">Regenerating...</span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <Accordion type="multiple" className="space-y-3">
-                                            {currentPlan?.workoutPlan?.exercises?.map((exerciseDay, index) => (
-                                                <AccordionItem
-                                                    key={index}
-                                                    value={exerciseDay.day}
-                                                    className="border rounded-lg overflow-hidden"
-                                                >
-                                                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                                                        <div className="flex justify-between w-full items-center">
-                                                            <span className="font-semibold text-primary">{exerciseDay.day}</span>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {exerciseDay.routines.length} exercises
-                                                            </div>
-                                                        </div>
-                                                    </AccordionTrigger>
-
-                                                    <AccordionContent className="pb-4 px-4">
-                                                        <div className="space-y-3 mt-2">
-                                                            {exerciseDay.routines.map((routine, routineIndex) => (
-                                                                <div
-                                                                    key={routineIndex}
-                                                                    className="rounded-xl p-4 bg-card/50 shadow-soft"
-                                                                >
-                                                                    <div className="flex justify-between items-start mb-2">
-                                                                        <h4 className="font-semibold text-sm">
-                                                                            {routine.name}
-                                                                        </h4>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <div className="px-2 py-1 rounded bg-primary/10 text-primary text-xs font-medium">
-                                                                                {routine.sets} sets
-                                                                            </div>
-                                                                            <div className="px-2 py-1 rounded bg-muted text-muted-foreground text-xs font-medium">
-                                                                                {routine.reps} reps
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    {routine.description && (
-                                                                        <p className="text-sm text-muted-foreground mt-1">
-                                                                            {routine.description}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </AccordionContent>
-                                                </AccordionItem>
-                                            ))}
-                                        </Accordion>
-                                    </div>
-                                </TabsContent>
-
-                                <TabsContent value="diet">
-                                    <div className="space-y-6">
-                                        <div className="flex justify-between items-center p-4 rounded-lg bg-muted/30">
-                                            <span className="text-sm font-medium text-muted-foreground">
-                                                Daily Calorie Target
-                                            </span>
-                                            <div className="text-xl font-semibold text-primary">
-                                                {currentPlan.dietPlan.dailyCalories} kcal
-                                            </div>
-                                        </div>
-
-                                        <div className="flex justify-end">
-                                            <Button
-                                                onClick={() => setShowAddMeal(!showAddMeal)}
-                                                variant="outline"
-                                            >
-                                                {showAddMeal ? "Cancel" : "+ Add Meal"}
-                                            </Button>
-                                        </div>
-
-                                        {showAddMeal && (
-                                            <Card>
-                                                <CardHeader>
-                                                    <CardTitle>Add New Meal</CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-3">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Meal name (e.g., Snack)"
-                                                        value={newMeal.name}
-                                                        onChange={(e) =>
-                                                            setNewMeal({ ...newMeal, name: e.target.value })
-                                                        }
-                                                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                                    />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Foods (comma-separated, e.g., Apple, Almonds)"
-                                                        value={newMeal.foods}
-                                                        onChange={(e) =>
-                                                            setNewMeal({ ...newMeal, foods: e.target.value })
-                                                        }
-                                                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Calories"
-                                                        value={newMeal.calories || ""}
-                                                        onChange={(e) =>
-                                                            setNewMeal({
-                                                                ...newMeal,
-                                                                calories: parseInt(e.target.value) || 0,
-                                                            })
-                                                        }
-                                                        className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                                    />
-                                                    <Button
-                                                        onClick={handleAddMeal}
-                                                        className="w-full bg-primary text-primary-foreground"
-                                                    >
-                                                        Add Meal
-                                                    </Button>
-                                                </CardContent>
-                                            </Card>
-                                        )}
-
-                                        <div className="space-y-3">
-                                            {currentPlan?.dietPlan?.meals?.map((meal, index) => (
-                                                <Card key={index}>
-                                                    <CardContent className="pt-6">
-                                                        <div className="flex items-center gap-2 mb-3">
-                                                            <div className="w-2 h-2 rounded-full bg-primary"></div>
-                                                            <h4 className="font-semibold text-primary">{meal.name}</h4>
-                                                            <span className="text-xs text-muted-foreground ml-auto">
-                                                                {meal.calories} kcal
+                                                <div className={cn(
+                                                    "mt-1 w-2 h-2 rounded-full flex-shrink-0",
+                                                    isActive ? "bg-primary" : "bg-muted-foreground"
+                                                )} />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                                        <span className="font-semibold text-[#E6EAF0]">
+                                                            {categoryLabels[goal.category]}
+                                                        </span>
+                                                        {isActive && (
+                                                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/20 text-primary">
+                                                                Active
                                                             </span>
-                                                        </div>
-                                                        <ul className="space-y-2">
-                                                            {meal.foods.map((food, foodIndex) => (
-                                                                <li
-                                                                    key={foodIndex}
-                                                                    className="flex items-center gap-2 text-sm text-muted-foreground"
-                                                                >
-                                                                    <span className="text-xs text-primary font-medium">
-                                                                        {String(foodIndex + 1).padStart(2, "0")}
-                                                                    </span>
-                                                                    {food}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </CardContent>
-                                                </Card>
-                                            ))}
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-1 text-sm text-muted-foreground">
+                                                        {goal.category === "body_composition" && (
+                                                            <>
+                                                                {goal.direction && (
+                                                                    <p className="text-[#E6EAF0]">
+                                                                        {goal.direction.charAt(0).toUpperCase() + goal.direction.slice(1)}
+                                                                        {goal.value && goal.unit && ` ${goal.value} ${goal.unit}`}
+                                                                    </p>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                        {goal.category === "strength" && goal.target?.exercise && (
+                                                            <>
+                                                                <p className="text-[#E6EAF0] font-medium">{goal.target.exercise}</p>
+                                                                {goal.target.metric && (
+                                                                    <p className="text-xs">Metric: {goal.target.metric}</p>
+                                                                )}
+                                                                {goal.value && goal.unit && (
+                                                                    <p className="text-xs">Target: {goal.value} {goal.unit}</p>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                        {goal.category === "endurance" && goal.target?.movement && (
+                                                            <>
+                                                                <p className="text-[#E6EAF0] font-medium">{goal.target.movement}</p>
+                                                                {goal.target.metric && (
+                                                                    <p className="text-xs">Metric: {goal.target.metric}</p>
+                                                                )}
+                                                                {goal.value && goal.unit && (
+                                                                    <p className="text-xs">Target: {goal.value} {goal.unit}</p>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                        {goal.category === "mobility" && goal.target?.movement && (
+                                                            <>
+                                                                <p className="text-[#E6EAF0] font-medium">{goal.target.movement}</p>
+                                                                {goal.value && goal.unit && (
+                                                                    <p className="text-xs">Target: {goal.value} {goal.unit}</p>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                        {goal.category === "skill" && goal.target?.movement && (
+                                                            <p className="text-[#E6EAF0] font-medium">{goal.target.movement}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {!isActive && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon-sm"
+                                                            onClick={() => handleSetActiveGoal(goal._id)}
+                                                            title="Set as active goal"
+                                                        >
+                                                            <CheckIcon className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                        onClick={() => handleEditGoal(goal._id)}
+                                                        title="Edit goal"
+                                                    >
+                                                        <PencilIcon className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                        onClick={() => handleDeleteGoal(goal._id)}
+                                                        title="Delete goal"
+                                                        className="text-destructive hover:text-destructive/80 hover:bg-destructive/10"
+                                                    >
+                                                        <Trash2Icon className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="text-center py-12 text-muted-foreground">
+                                        <div className="p-4 bg-primary/5 rounded-full w-fit mx-auto mb-4">
+                                            <TargetIcon className="h-8 w-8 text-primary/50" />
                                         </div>
+                                        <p className="font-medium mb-1">No goals set yet</p>
+                                        <p className="text-sm">Add goals to track what you're working toward</p>
                                     </div>
-                                </TabsContent>
-                            </Tabs>
-                            </CardContent>
-                        </Card>
+                                )}
+                            </div>
                         )}
-                    </div>
-                ) : (
-                    <NoFitnessPlan />
-                )}
+                    </CardContent>
+                </Card>
+
+                {/* Plans section removed - plans are deprecated, use goals instead */}
             </div>
         </Page>
     );

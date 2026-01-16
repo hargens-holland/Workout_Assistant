@@ -12,24 +12,14 @@ export const getTodayWorkout = query({
         date: v.string(), // ISO date string (YYYY-MM-DD)
     },
     handler: async (ctx, args) => {
-        // Get active plan
-        const activePlan = await ctx.db
-            .query("plans")
-            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
-            .filter((q) => q.eq(q.field("isActive"), true))
+        // Get session for this date
+        const session = await ctx.db
+            .query("workout_sessions")
+            .withIndex("by_user_and_date", (q) => 
+                q.eq("userId", args.userId).eq("date", args.date)
+            )
             .first();
 
-        if (!activePlan) {
-            return null;
-        }
-
-        // Get session for this date
-        const sessions = await ctx.db
-            .query("workout_sessions")
-            .withIndex("by_plan_id", (q) => q.eq("planId", activePlan._id))
-            .collect();
-
-        const session = sessions.find((s) => s.date === args.date);
         if (!session) {
             return null;
         }
@@ -124,40 +114,26 @@ export const reduceWorkoutVolume = mutation({
 });
 
 /**
- * Action to add an accessory exercise to upcoming sessions
+ * Action to add an accessory exercise to today's workout only
  */
 export const addAccessoryExercise = action({
     args: {
         userId: v.id("users"),
-        planId: v.id("plans"),
         bodyPart: v.string(),
-        count: v.number(), // Number of sessions to add to (1-2)
     },
-    handler: async (ctx, args): Promise<{ success: boolean; sessionsUpdated: number }> => {
+    handler: async (ctx, args): Promise<{ success: boolean }> => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const sevenDaysLater = new Date(today);
-        sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
-        const endDateStr = sevenDaysLater.toISOString().split("T")[0];
         const todayStr = today.toISOString().split("T")[0];
 
-        // Get upcoming workouts using the date range query
-        const upcomingWorkouts: any[] = await ctx.runQuery(api.plans.getWorkoutsByDateRange, {
+        // Get today's workout only
+        const todayWorkout = await ctx.runQuery(api.plans.getWorkoutByDate, {
             userId: args.userId,
-            startDate: todayStr,
-            endDate: endDateStr,
+            date: todayStr,
         });
 
-        // Filter to get only sessions (not full workout objects) and take the count
-        const upcomingSessions: Array<{ _id: Id<"workout_sessions">; date: string }> = upcomingWorkouts
-            .slice(0, args.count)
-            .map((w: any) => ({
-                _id: w._id,
-                date: w.date,
-            }));
-
-        if (upcomingSessions.length === 0) {
-            throw new Error("No upcoming sessions found");
+        if (!todayWorkout) {
+            throw new Error("No workout found for today. Please generate today's workout first.");
         }
 
         // Select a random exercise for the body part
@@ -174,28 +150,24 @@ export const addAccessoryExercise = action({
 
         const exerciseId = exerciseIds[0];
 
-        // Add exercise to each session
-        for (const session of upcomingSessions) {
-            // Get existing sets to determine setNumber - use the workout data we already have
-            const workout = upcomingWorkouts.find((w: any) => w._id === session._id);
-            const existingSets = workout?.exercises || [];
-            const maxSetNumber = existingSets.length > 0
-                ? Math.max(...existingSets.map((s: any) => s.setNumber || 0))
-                : 0;
+        // Get existing sets to determine setNumber
+        const existingSets = todayWorkout.exercises || [];
+        const maxSetNumber = existingSets.length > 0
+            ? Math.max(...existingSets.map((s: any) => s.setNumber || 0))
+            : 0;
 
-            // Create 3 sets for the accessory
-            for (let i = 1; i <= 3; i++) {
-                await ctx.runMutation(api.plans.createExerciseSet, {
-                    sessionId: session._id,
-                    exerciseId,
-                    plannedWeight: 0, // Will be calculated by progression
-                    plannedReps: 12, // Moderate reps for accessory
-                    setNumber: maxSetNumber + i,
-                });
-            }
+        // Create 3 sets for the accessory
+        for (let i = 1; i <= 3; i++) {
+            await ctx.runMutation(api.plans.createExerciseSet, {
+                sessionId: todayWorkout._id,
+                exerciseId,
+                plannedWeight: 0, // Will be calculated by progression
+                plannedReps: 12, // Moderate reps for accessory
+                setNumber: maxSetNumber + i,
+            });
         }
 
-        return { success: true, sessionsUpdated: upcomingSessions.length };
+        return { success: true };
     },
 });
 
@@ -213,15 +185,15 @@ export const moveWorkoutSession = mutation({
             throw new Error("Session not found");
         }
 
-        // Check for duplicate
-        const existingSessions = await ctx.db
+        // Check for duplicate (same user, same date)
+        const existingSession = await ctx.db
             .query("workout_sessions")
-            .withIndex("by_plan_id", (q) => q.eq("planId", session.planId))
-            .collect();
+            .withIndex("by_user_and_date", (q) => 
+                q.eq("userId", session.userId).eq("date", args.newDate)
+            )
+            .first();
 
-        const duplicate = existingSessions.find(
-            (s) => s.date === args.newDate && s.planId === session.planId && s._id !== args.sessionId
-        );
+        const duplicate = existingSession && existingSession._id !== args.sessionId;
 
         if (duplicate) {
             throw new Error(`A workout session already exists for date ${args.newDate}`);
@@ -249,95 +221,26 @@ export const getWorkoutSessionById = query({
 });
 
 /**
- * Query to get upcoming workouts (next 7 days)
+ * Query to get today's workout only (no future workouts)
  */
 export const getUpcomingWorkouts = query({
     args: {
         userId: v.id("users"),
     },
     handler: async (ctx, args) => {
-        const activePlan = await ctx.db
-            .query("plans")
-            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
-            .filter((q) => q.eq(q.field("isActive"), true))
-            .first();
-
-        if (!activePlan) {
-            return [];
-        }
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const sevenDaysLater = new Date(today);
-        sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
-        const endDateStr = sevenDaysLater.toISOString().split("T")[0];
         const todayStr = today.toISOString().split("T")[0];
 
-        const sessions = await ctx.db
+        const session = await ctx.db
             .query("workout_sessions")
-            .withIndex("by_plan_id", (q) => q.eq("planId", activePlan._id))
-            .filter((q) => q.gte(q.field("date"), todayStr))
-            .filter((q) => q.lte(q.field("date"), endDateStr))
-            .order("asc")
-            .collect();
+            .withIndex("by_user_and_date", (q) => 
+                q.eq("userId", args.userId).eq("date", todayStr)
+            )
+            .first();
 
-        return sessions;
+        return session ? [session] : [];
     },
 });
 
-/**
- * Query to get workout history (last 14 days)
- */
-export const getWorkoutHistory = query({
-    args: {
-        userId: v.id("users"),
-    },
-    handler: async (ctx, args) => {
-        const activePlan = await ctx.db
-            .query("plans")
-            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
-            .filter((q) => q.eq(q.field("isActive"), true))
-            .first();
-
-        if (!activePlan) {
-            return [];
-        }
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const fourteenDaysAgo = new Date(today);
-        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-        const startDateStr = fourteenDaysAgo.toISOString().split("T")[0];
-        const todayStr = today.toISOString().split("T")[0];
-
-        const sessions = await ctx.db
-            .query("workout_sessions")
-            .withIndex("by_plan_id", (q) => q.eq("planId", activePlan._id))
-            .filter((q) => q.gte(q.field("date"), startDateStr))
-            .filter((q) => q.lte(q.field("date"), todayStr))
-            .order("desc")
-            .collect();
-
-        // Get completion stats for each session
-        const sessionsWithStats = await Promise.all(
-            sessions.map(async (session) => {
-                const sets = await ctx.db
-                    .query("exercise_sets")
-                    .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
-                    .collect();
-
-                const completedSets = sets.filter((s) => s.completed).length;
-                const totalSets = sets.length;
-
-                return {
-                    ...session,
-                    completedSets,
-                    totalSets,
-                    completionRate: totalSets > 0 ? completedSets / totalSets : 0,
-                };
-            })
-        );
-
-        return sessionsWithStats;
-    },
-});
+// getWorkoutHistory moved to plans.ts

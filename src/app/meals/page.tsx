@@ -22,8 +22,8 @@ const MealsPage = () => {
         user?.id ? { clerkId: user.id } : "skip"
     );
 
-    const activePlan = useQuery(
-        api.plans.getActivePlan,
+    const activeGoal = useQuery(
+        api.goals.getActiveGoal,
         convexUser?._id ? { userId: convexUser._id } : "skip"
     );
 
@@ -78,8 +78,34 @@ const MealsPage = () => {
         mealType: "",
     });
 
-    // Calculate nutrition stats
-    const targetCalories = activePlan?.dietPlan?.dailyCalories || 0;
+    // Calculate nutrition stats from goal
+    // Simple calculation: default 2000, adjust based on goal category
+    const calculateTargetCalories = () => {
+        if (!activeGoal || !convexUser) return 2000;
+        const weightKg = convexUser.weight_kg || 70;
+        const heightCm = convexUser.height_cm || 175;
+        const age = 30; // Default age for BMR calculation
+
+        // BMR calculation (Mifflin-St Jeor, simplified)
+        const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
+        const tdee = bmr * 1.55; // Moderate activity
+
+        if (activeGoal.category === "body_composition") {
+            if (activeGoal.direction === "decrease") {
+                return Math.round((tdee - 625) / 50) * 50; // Weight loss
+            } else if (activeGoal.direction === "increase") {
+                return Math.round((tdee + 400) / 50) * 50; // Weight gain
+            }
+            return Math.round(tdee / 50) * 50; // Maintenance
+        } else if (activeGoal.category === "strength") {
+            return Math.round((tdee + 200) / 50) * 50;
+        } else if (activeGoal.category === "endurance") {
+            return Math.round((tdee + 300) / 50) * 50;
+        }
+        return Math.round(tdee / 50) * 50; // Default maintenance
+    };
+
+    const targetCalories = calculateTargetCalories();
     const loggedCalories = todayMealLogs?.reduce((sum, log) => sum + log.calories, 0) || 0;
     const plannedMealCalories = todayWorkout?.[0]?.meals?.reduce((sum: number, dm: any) => {
         return sum + (dm.meal?.calories || 0);
@@ -153,7 +179,6 @@ const MealsPage = () => {
                 await regenerateMeal({
                     dailyMealId: existingMeal._id,
                     userId: convexUser._id,
-                    planId: activePlan!._id,
                 });
             } else {
                 // Create new daily meal
@@ -180,16 +205,16 @@ const MealsPage = () => {
         );
     }
 
-    if (!activePlan) {
+    if (!activeGoal) {
         return (
             <Page>
                 <Card className="max-w-2xl mx-auto">
                     <CardContent className="pt-6">
                         <div className="text-center space-y-4">
-                            <h2 className="text-2xl font-semibold">No Active Plan</h2>
-                            <p className="text-muted-foreground">Create a plan to view meals.</p>
+                            <h2 className="text-2xl font-semibold">No Active Goal</h2>
+                            <p className="text-muted-foreground">Create a goal to track your nutrition.</p>
                             <Button asChild className="mt-4">
-                                <Link href="/generate-program">Create Plan</Link>
+                                <Link href="/generate-program">Create Goal</Link>
                             </Button>
                         </div>
                     </CardContent>
@@ -257,7 +282,7 @@ const MealsPage = () => {
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-2">
-                                                    {convexUser?._id && activePlan?._id && meal?._id && (
+                                                    {convexUser?._id && meal?._id && (
                                                         <>
                                                             <Button
                                                                 size="sm"
@@ -267,7 +292,6 @@ const MealsPage = () => {
                                                                         await regenerateMeal({
                                                                             dailyMealId: dailyMeal._id,
                                                                             userId: convexUser._id,
-                                                                            planId: activePlan._id,
                                                                         });
                                                                     } catch (error) {
                                                                         alert("Failed to regenerate meal");

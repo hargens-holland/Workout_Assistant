@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery, useAction } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 /* =======================
@@ -77,9 +77,9 @@ export default function GenerateProgramPage() {
         user?.id ? { clerkId: user.id } : "skip"
     );
 
-    // Get all saved plans for the user
-    const savedPlans = useQuery(
-        api.plans.getUserPlans,
+    // Get active goal for the user
+    const activeGoal = useQuery(
+        api.goals.getActiveGoal,
         dbUser?._id ? { userId: dbUser._id } : "skip"
     );
 
@@ -89,9 +89,10 @@ export default function GenerateProgramPage() {
     const [collectedData, setCollectedData] = useState<CollectedData>({});
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [generatedPlan, setGeneratedPlan] = useState<any>(null);
+    const [goalCreated, setGoalCreated] = useState(false);
 
-    const generatePlanAction = useAction(api.plans.generatePlan);
+    const createGoal = useMutation(api.goals.createGoal);
+    const updateProfile = useMutation(api.users.updateProfile);
 
     const messageContainerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -245,7 +246,7 @@ export default function GenerateProgramPage() {
                 setCurrentNode(nextNode);
             }, 300);
         } else {
-            // Show confirmation and generate plan
+            // Show confirmation and create goal
             setTimeout(() => {
                 setMessages(prev => [...prev, {
                     role: "assistant",
@@ -253,16 +254,16 @@ export default function GenerateProgramPage() {
                     timestamp: new Date(),
                 }]);
                 setCurrentNode("GENERATING");
-                generatePlan(newData);
+                createGoalAndProfile(newData);
             }, 300);
         }
     };
 
     /* =======================
-       Generate Plan with Gemini
+       Create Goal and Update Profile
     ======================= */
 
-    const generatePlan = async (data: CollectedData) => {
+    const createGoalAndProfile = async (data: CollectedData) => {
         if (!dbUser?._id) {
             setError("User not found. Please make sure you're logged in.");
             return;
@@ -272,37 +273,155 @@ export default function GenerateProgramPage() {
         setError(null);
 
         try {
-            // Call Convex action to generate plan
-            const result = await generatePlanAction({
+            // Helper function to convert height string to cm
+            function convertHeightToCm(heightStr: string): number {
+                const lower = heightStr.toLowerCase().trim();
+                const feetInchesMatch = lower.match(/(\d+)\s*(?:'|ft|feet)\s*(\d+)?/);
+                if (feetInchesMatch) {
+                    const feet = parseInt(feetInchesMatch[1]);
+                    const inches = feetInchesMatch[2] ? parseInt(feetInchesMatch[2]) : 0;
+                    return Math.round((feet * 30.48) + (inches * 2.54));
+                }
+                const cmMatch = lower.match(/(\d+)\s*cm/);
+                if (cmMatch) {
+                    return parseInt(cmMatch[1]);
+                }
+                const numbers = lower.match(/\d+/g);
+                if (numbers && numbers.length > 0) {
+                    const num = parseInt(numbers[0]);
+                    if (num > 100) {
+                        return num;
+                    } else {
+                        const inches = numbers[1] ? parseInt(numbers[1]) : 0;
+                        return Math.round((num * 30.48) + (inches * 2.54));
+                    }
+                }
+                return 175;
+            }
+
+            // Helper function to convert weight string to kg
+            function convertWeightToKg(weightStr: string): number {
+                const lower = weightStr.toLowerCase().trim();
+                const lbsMatch = lower.match(/(\d+(?:\.\d+)?)\s*(?:lbs?|pounds?)/);
+                if (lbsMatch) {
+                    return Math.round(parseFloat(lbsMatch[1]) * 0.453592);
+                }
+                const kgMatch = lower.match(/(\d+(?:\.\d+)?)\s*kg/);
+                if (kgMatch) {
+                    return Math.round(parseFloat(kgMatch[1]));
+                }
+                const numbers = lower.match(/\d+(?:\.\d+)?/);
+                if (numbers) {
+                    const num = parseFloat(numbers[0]);
+                    if (num > 50) {
+                        return Math.round(num);
+                    } else {
+                        return Math.round(num * 0.453592);
+                    }
+                }
+                return 70;
+            }
+
+            // Helper function to normalize experience level
+            function normalizeExperienceLevel(level: string): "beginner" | "intermediate" | "advanced" {
+                const lower = level.toLowerCase();
+                if (lower.includes("beginner") || lower.includes("new") || lower.includes("starting")) {
+                    return "beginner";
+                }
+                if (lower.includes("advanced") || lower.includes("expert") || lower.includes("experienced")) {
+                    return "advanced";
+                }
+                return "intermediate";
+            }
+
+            // Helper function to convert fitness goal to goal category
+            function fitnessGoalToCategory(fitnessGoal: string): "body_composition" | "strength" | "endurance" | "mobility" | "skill" {
+                const lower = fitnessGoal.toLowerCase();
+                if (lower.includes("lose") || lower.includes("fat") || lower.includes("weight") || lower.includes("cut")) {
+                    return "body_composition";
+                }
+                if (lower.includes("strength") || lower.includes("strong") || lower.includes("power") || lower.includes("lift")) {
+                    return "strength";
+                }
+                if (lower.includes("endurance") || lower.includes("cardio") || lower.includes("run") || lower.includes("marathon")) {
+                    return "endurance";
+                }
+                if (lower.includes("mobility") || lower.includes("flexibility")) {
+                    return "mobility";
+                }
+                if (lower.includes("skill") || lower.includes("technique")) {
+                    return "skill";
+                }
+                return "body_composition";
+            }
+
+            // Auto-select split based on workout days
+            function autoSelectSplit(workoutDays: number): "PPL" | "UPPER_LOWER" | "FULL_BODY" | "BRO_SPLIT" | "PUSH_PULL_LEGS_ARMS" {
+                if (workoutDays >= 6) {
+                    return "PPL";
+                } else if (workoutDays === 5) {
+                    return "BRO_SPLIT";
+                } else if (workoutDays === 4) {
+                    return "UPPER_LOWER";
+                } else if (workoutDays === 3) {
+                    return "FULL_BODY";
+                } else {
+                    return "FULL_BODY";
+                }
+            }
+
+            // Convert and save user profile data
+            const heightCm = convertHeightToCm(data.height!);
+            const weightKg = convertWeightToKg(data.weight!);
+            const experienceLevel = normalizeExperienceLevel(data.fitness_level!);
+            const splitType = autoSelectSplit(data.workout_days!);
+            
+            // Parse injuries into array
+            const injuryConstraints = data.injuries && data.injuries.toLowerCase() !== "none" && data.injuries.trim() !== ""
+                ? [data.injuries.trim()]
+                : [];
+
+            // Update user profile
+            await updateProfile({
                 userId: dbUser._id,
-                age: data.age!,
-                height: data.height!,
-                weight: data.weight!,
-                injuries: data.injuries || "None",
-                workout_days: data.workout_days!,
-                fitness_goal: data.fitness_goal!,
-                fitness_level: data.fitness_level!,
-                dietary_restrictions: data.dietary_restrictions || "None",
-                // split_type is now auto-selected based on workout_days
+                height_cm: heightCm,
+                weight_kg: weightKg,
+                experience_level: experienceLevel,
+                injury_constraints: injuryConstraints,
+                preferences: {
+                    preferred_split: splitType,
+                    workout_days_per_week: data.workout_days!,
+                    dietary_restrictions: data.dietary_restrictions || "None",
+                },
             });
 
-            if (result.success) {
-                setGeneratedPlan(result.data);
-                setCurrentNode("COMPLETE");
-                setMessages(prev => [...prev, {
-                    role: "assistant",
-                    content: CONVERSATION_MESSAGES.COMPLETE,
-                    timestamp: new Date(),
-                }]);
-            } else {
-                throw new Error("Failed to generate plan");
-            }
-        } catch (err) {
-            console.error("Error generating plan:", err);
-            setError(err instanceof Error ? err.message : "Failed to generate plan");
+            // Create goal based on fitness goal
+            const goalCategory = fitnessGoalToCategory(data.fitness_goal!);
+            const goalDirection = goalCategory === "body_composition" 
+                ? (data.fitness_goal!.toLowerCase().includes("lose") || data.fitness_goal!.toLowerCase().includes("fat") ? "decrease" : "increase")
+                : "increase";
+
+            // Create the goal
+            await createGoal({
+                userId: dbUser._id,
+                category: goalCategory,
+                direction: goalDirection,
+                priority: "high",
+            });
+
+            setGoalCreated(true);
+            setCurrentNode("COMPLETE");
             setMessages(prev => [...prev, {
                 role: "assistant",
-                content: `Sorry, there was an error generating your plan: ${err instanceof Error ? err.message : "Unknown error"}`,
+                content: CONVERSATION_MESSAGES.COMPLETE,
+                timestamp: new Date(),
+            }]);
+        } catch (err) {
+            console.error("Error creating goal:", err);
+            setError(err instanceof Error ? err.message : "Failed to create goal");
+            setMessages(prev => [...prev, {
+                role: "assistant",
+                content: `Sorry, there was an error setting up your profile: ${err instanceof Error ? err.message : "Unknown error"}`,
                 timestamp: new Date(),
             }]);
         } finally {
@@ -409,105 +528,23 @@ export default function GenerateProgramPage() {
                         </div>
                     )}
 
-                    {currentNode === "COMPLETE" && generatedPlan && (
+                    {currentNode === "COMPLETE" && goalCreated && (
                         <div className="mt-4 space-y-4">
-                            <div>
-                                <h3 className="text-lg font-semibold mb-3">💪 Your Workout Plan</h3>
-                                <div className="bg-muted/30 border rounded-lg p-4">
-                                    <div className="mb-2">
-                                        <span className="font-semibold">Schedule: </span>
-                                        {generatedPlan.workoutPlan?.schedule?.join(", ")}
-                                    </div>
-                                    <div className="space-y-3 mt-4">
-                                        {generatedPlan.workoutPlan?.exercises?.map((exercise: any, idx: number) => (
-                                            <div key={idx} className="border-l-2 border-primary pl-3">
-                                                <h4 className="font-semibold">{exercise.day}</h4>
-                                                <ul className="list-disc list-inside space-y-1 mt-1 text-sm">
-                                                    {exercise.routines?.map((routine: any, rIdx: number) => (
-                                                        <li key={rIdx}>
-                                                            {routine.name} - {routine.sets} sets × {routine.reps} reps
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="text-lg font-semibold mb-3">🍽️ Your Meal Plan</h3>
-                                <div className="bg-muted/30 border rounded-lg p-4">
-                                    <div className="mb-3">
-                                        <span className="font-semibold">Daily Calories: </span>
-                                        {generatedPlan.dietPlan?.dailyCalories}
-                                    </div>
-                                    <div className="space-y-2">
-                                        {generatedPlan.dietPlan?.meals?.map((meal: any, idx: number) => (
-                                            <div key={idx} className="border-l-2 border-green-500 pl-3">
-                                                <h4 className="font-semibold">{meal.name}</h4>
-                                                <ul className="list-disc list-inside space-y-1 mt-1 text-sm">
-                                                    {meal.foods?.map((food: string, fIdx: number) => (
-                                                        <li key={fIdx}>{food}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                            <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg">
+                                <h3 className="text-lg font-semibold mb-2">✅ Profile Created!</h3>
+                                <p className="mb-2">Your profile and goal have been set up successfully.</p>
+                                <p className="text-sm">You can now go to the home page to generate today's workout.</p>
                             </div>
 
                             <Button className="w-full" onClick={() => {
-                                setCurrentNode("INTRO");
-                                setMessages([]);
-                                setCollectedData({});
-                                setGeneratedPlan(null);
-                                setError(null);
+                                window.location.href = "/home";
                             }}>
-                                Start New Conversation
+                                Go to Home
                             </Button>
                         </div>
                     )}
                 </Card>
 
-                {/* Display Saved Plans */}
-                {user && dbUser && savedPlans && savedPlans.length > 0 && (
-                    <Card className="p-6">
-                        <h2 className="text-xl font-bold mb-4">📋 Your Saved Plans</h2>
-                        <div className="space-y-4">
-                            {savedPlans.map((plan: any) => (
-                                <div
-                                    key={plan._id}
-                                    className="border rounded-lg p-4 bg-muted/30 space-y-2"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="font-semibold">{plan.name}</h3>
-                                            <p className="text-sm text-muted-foreground">
-                                                Created: {new Date(plan._creationTime).toLocaleDateString()}
-                                                {plan.isActive && (
-                                                    <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">
-                                                        Active
-                                                    </span>
-                                                )}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                            <span className="font-semibold">Workout Days: </span>
-                                            {plan.workoutPlan.schedule.join(", ")}
-                                        </div>
-                                        <div>
-                                            <span className="font-semibold">Daily Calories: </span>
-                                            {plan.dietPlan.dailyCalories}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </Card>
-                )}
             </div>
         </div>
     );

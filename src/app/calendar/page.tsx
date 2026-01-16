@@ -19,13 +19,8 @@ const CalendarPage = () => {
         user?.id ? { clerkId: user.id } : "skip"
     );
 
-    const activePlan = useQuery(
-        api.plans.getActivePlan,
-        convexUser?._id ? { userId: convexUser._id } : "skip"
-    );
-
-    const allPlans = useQuery(
-        api.plans.getUserPlans,
+    const activeGoal = useQuery(
+        api.goals.getActiveGoal,
         convexUser?._id ? { userId: convexUser._id } : "skip"
     );
 
@@ -36,12 +31,8 @@ const CalendarPage = () => {
     const [viewMonth, setViewMonth] = useState(new Date());
     const [editingSets, setEditingSets] = useState<Record<string, { weight: string; reps: string }>>({});
 
-    const generateWorkouts = useAction(api.plans.generateWorkoutsFromStrategy);
-    const setActivePlan = useMutation(api.plans.setActivePlan);
-    const deletePlan = useMutation(api.plans.deletePlan);
     const updateExerciseSet = useMutation(api.plans.updateExerciseSet);
     const markMealComplete = useMutation(api.plans.markMealComplete);
-    const generateNextWorkout = useAction(api.plans.generateNextWorkout);
     const regenerateMeal = useAction(api.plans.regenerateMeal);
     const regenerateExercise = useAction(api.plans.regenerateExercise);
     const blockItem = useMutation(api.plans.blockItem);
@@ -53,7 +44,7 @@ const CalendarPage = () => {
 
     const workouts = useQuery(
         api.plans.getWorkoutsByDateRange,
-        convexUser?._id && activePlan?._id
+        convexUser?._id
             ? {
                   userId: convexUser._id,
                   startDate,
@@ -62,78 +53,11 @@ const CalendarPage = () => {
             : "skip"
     );
 
-    // Debug: Get all workout sessions to see if any exist
-    const allWorkoutSessions = useQuery(
-        api.plans.getAllWorkoutSessions,
-        convexUser?._id ? { userId: convexUser._id } : "skip"
-    );
-
-    // Debug logging
-    if (workouts) {
-        console.log("Workouts for current month:", {
-            count: workouts.length,
-            startDate,
-            endDate,
-            workouts: workouts.map(w => ({ date: w.date, exercises: w.exercises.length }))
-        });
-    }
-
-    if (allWorkoutSessions) {
-        console.log("All workout sessions for user:", {
-            total: allWorkoutSessions.length,
-            sessions: allWorkoutSessions,
-            currentMonthRange: { startDate, endDate },
-        });
-    }
 
     const selectedWorkout = workouts?.find(
         (w) => w.date === selectedDate
     );
 
-    const handleGenerateWorkouts = async () => {
-        if (!convexUser?._id || !activePlan?._id) return;
-        try {
-            console.log("Generating workouts...", {
-                planId: activePlan._id,
-                userId: convexUser._id,
-            });
-            const result = await generateWorkouts({
-                planId: activePlan._id,
-                userId: convexUser._id,
-            });
-            console.log("Workout generation result:", result);
-            // Don't show alert, let Convex auto-refresh the query
-            // The workouts should appear automatically via reactive queries
-        } catch (error) {
-            console.error("Error generating workouts:", error);
-            alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    };
-
-    const handleSetActivePlan = async (planId: string) => {
-        if (!convexUser?._id) return;
-        try {
-            await setActivePlan({
-                planId: planId as any,
-                userId: convexUser._id,
-            });
-        } catch (error) {
-            console.error("Error setting active plan:", error);
-            alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    };
-
-    const handleDeletePlan = async (planId: string) => {
-        if (!confirm("Are you sure you want to delete this plan? This will also delete all associated workouts.")) {
-            return;
-        }
-        try {
-            await deletePlan({ planId: planId as any });
-        } catch (error) {
-            console.error("Error deleting plan:", error);
-            alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    };
 
     const getDaysInMonth = () => {
         const year = viewMonth.getFullYear();
@@ -183,41 +107,23 @@ const CalendarPage = () => {
         <Page>
             <div className="max-w-6xl mx-auto space-y-8">
                 <PageHeader
-                    title="Training Calendar"
-                    description="View and manage your workout schedule"
-                    action={
-                        activePlan && (
-                            <Button
-                                onClick={handleGenerateWorkouts}
-                                className="bg-primary text-primary-foreground hover:bg-primary/90"
-                            >
-                                Generate Workouts
-                            </Button>
-                        )
-                    }
+                    title="Workout History"
+                    description="View your past workouts and meals"
                 />
-                {!activePlan ? (
+                {!activeGoal ? (
                     <Card>
                         <CardContent className="pt-6">
                             <div className="text-center py-12 text-muted-foreground">
-                                <p>No active plan found. Create a plan first.</p>
+                                <p>No active goal found. Create a goal first to start tracking workouts.</p>
                             </div>
                         </CardContent>
                     </Card>
-                ) : allWorkoutSessions && allWorkoutSessions.length > 0 && workouts && workouts.length === 0 ? (
+                ) : workouts && workouts.length === 0 ? (
                     <Card>
                         <CardContent className="pt-6">
-                            <div className="text-center py-12">
-                                <p className="text-muted-foreground mb-2">
-                                    You have {allWorkoutSessions.length} workout{allWorkoutSessions.length !== 1 ? "s" : ""} scheduled, but none in this month.
-                                </p>
-                                <p className="text-sm text-muted-foreground mb-4">
-                                    Workout dates: {allWorkoutSessions.slice(0, 5).map(s => s.date).join(", ")}
-                                    {allWorkoutSessions.length > 5 && "..."}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    Try navigating to a different month to see your workouts.
-                                </p>
+                            <div className="text-center py-12 text-muted-foreground">
+                                <p>No workouts found for this month.</p>
+                                <p className="text-sm mt-2">Navigate to different months to view your workout history.</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -262,17 +168,19 @@ const CalendarPage = () => {
                                         const isToday =
                                             dateStr ===
                                             new Date().toISOString().split("T")[0];
+                                        const isFuture = dateStr > new Date().toISOString().split("T")[0];
 
                                         return (
                                             <button
                                                 key={idx}
                                                 onClick={() =>
-                                                    day && setSelectedDate(dateStr)
+                                                    day && !isFuture && setSelectedDate(dateStr)
                                                 }
-                                                disabled={!day}
+                                                disabled={!day || isFuture}
                                                 className={cn(
                                                     "aspect-square p-2 rounded-lg border transition-colors",
                                                     !day && "border-transparent",
+                                                    isFuture && "opacity-50 cursor-not-allowed",
                                                     isSelected
                                                         ? "bg-primary/10 border-primary text-primary"
                                                         : "border-border hover:border-primary/50 hover:bg-accent/50",
@@ -319,7 +227,6 @@ const CalendarPage = () => {
 
                                     <div>
                                         <span className="text-sm text-muted-foreground">
-                                            Week {selectedWorkout.weekNumber} •{" "}
                                             {selectedWorkout.intensity}
                                         </span>
                                     </div>
@@ -386,26 +293,7 @@ const CalendarPage = () => {
                                                             delete newEditingSets[setKey];
                                                             setEditingSets(newEditingSets);
                                                             
-                                                            // Check if all sets are completed, then generate next workout
-                                                            const updatedSets = setsForExercise.map(s => 
-                                                                s._id === set._id 
-                                                                    ? { ...s, completed: true, actualWeight: weight, actualReps: reps }
-                                                                    : s
-                                                            );
-                                                            const allDone = updatedSets.every(s => s.completed);
-                                                            
-                                                            if (allDone && convexUser?._id && activePlan?._id) {
-                                                                // Generate next workout
-                                                                try {
-                                                                    await generateNextWorkout({
-                                                                        planId: activePlan._id,
-                                                                        userId: convexUser._id,
-                                                                        completedSessionId: selectedWorkout._id,
-                                                                    });
-                                                                } catch (err) {
-                                                                    console.error("Error generating next workout:", err);
-                                                                }
-                                                            }
+                                                            // Workout completion - no automatic next workout generation
                                                         } catch (error) {
                                                             console.error("Error updating set:", error);
                                                             alert("Failed to update set");
@@ -430,30 +318,7 @@ const CalendarPage = () => {
                                                                             ✓ Complete
                                                                         </span>
                                                                     )}
-                                                                    {convexUser?._id && activePlan?._id && exercise?._id && setsForExercise.length > 0 && (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            onClick={async () => {
-                                                                                if (!confirm(`Replace "${exercise?.name}" with a new exercise of the same type?`)) return;
-                                                                                try {
-                                                                                    await regenerateExercise({
-                                                                                        exerciseSetId: setsForExercise[0]._id,
-                                                                                        userId: convexUser._id,
-                                                                                        planId: activePlan._id,
-                                                                                        sessionId: selectedWorkout._id,
-                                                                                    });
-                                                                                } catch (error) {
-                                                                                    console.error("Error regenerating exercise:", error);
-                                                                                    alert(error instanceof Error ? error.message : "Failed to regenerate exercise");
-                                                                                }
-                                                                            }}
-                                                                            className="text-primary hover:bg-primary/10"
-                                                                            title="Get a new exercise for this body part"
-                                                                        >
-                                                                            <RefreshCwIcon className="h-3 w-3" />
-                                                                        </Button>
-                                                                    )}
+                                                                    {/* Exercise regeneration only available for today's workout via chat */}
                                                                     {convexUser?._id && exercise?._id && (
                                                                         <Button
                                                                             size="sm"
@@ -635,28 +500,7 @@ const CalendarPage = () => {
                                                                     </div>
                                                                 </div>
                                                                 <div className="flex items-center gap-2">
-                                                                    {convexUser?._id && activePlan?._id && (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            onClick={async () => {
-                                                                                try {
-                                                                                    await regenerateMeal({
-                                                                                        dailyMealId: dailyMeal._id,
-                                                                                        userId: convexUser._id,
-                                                                                        planId: activePlan._id,
-                                                                                    });
-                                                                                } catch (error) {
-                                                                                    console.error("Error regenerating meal:", error);
-                                                                                    alert("Failed to regenerate meal");
-                                                                                }
-                                                                            }}
-                                                                            className="text-primary hover:bg-primary/10"
-                                                                            title="Get a new meal for this meal type"
-                                                                        >
-                                                                            <RefreshCwIcon className="h-3 w-3" />
-                                                                        </Button>
-                                                                    )}
+                                                                    {/* Meal regeneration only available for today's workout via chat */}
                                                                     {convexUser?._id && meal?._id && (
                                                                         <Button
                                                                             size="sm"

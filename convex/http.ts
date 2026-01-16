@@ -280,21 +280,45 @@ Do not include any text outside the JSON.`;
                 })),
             };
 
-            // save to our DB: CONVEX
-            const planId = await ctx.runMutation(api.plans.createPlan, {
+            // Plans are deprecated - create goal and update profile instead
+            // Helper function to convert fitness goal to goal category
+            function fitnessGoalToCategory(fitnessGoal: string): "body_composition" | "strength" | "endurance" | "mobility" | "skill" {
+                const lower = fitnessGoal.toLowerCase();
+                if (lower.includes("lose") || lower.includes("fat") || lower.includes("weight") || lower.includes("cut")) {
+                    return "body_composition";
+                }
+                if (lower.includes("strength") || lower.includes("strong") || lower.includes("power") || lower.includes("lift")) {
+                    return "strength";
+                }
+                if (lower.includes("endurance") || lower.includes("cardio") || lower.includes("run") || lower.includes("marathon")) {
+                    return "endurance";
+                }
+                if (lower.includes("mobility") || lower.includes("flexibility")) {
+                    return "mobility";
+                }
+                if (lower.includes("skill") || lower.includes("technique")) {
+                    return "skill";
+                }
+                return "body_composition";
+            }
+
+            // Create goal instead of plan
+            const goalCategory = fitnessGoalToCategory(fitness_goal);
+            const goalDirection = goalCategory === "body_composition"
+                ? (fitness_goal.toLowerCase().includes("lose") || fitness_goal.toLowerCase().includes("fat") ? "decrease" : "increase")
+                : "increase";
+
+            await ctx.runMutation(api.goals.createGoal, {
                 userId: user_id,
-                dietPlan: transformedDietPlan,
-                isActive: true,
-                workoutPlan: placeholderWorkoutPlan,
-                trainingStrategy: trainingStrategy,
-                name: `${fitness_goal} Plan - ${new Date().toLocaleDateString()}`,
+                category: goalCategory,
+                direction: goalDirection,
             });
 
             return new Response(
                 JSON.stringify({
                     success: true,
                     data: {
-                        planId,
+                        message: "Goal created successfully. Use generateDailyWorkoutAndMeals to generate today's workout.",
                         trainingStrategy: trainingStrategy,
                         dietPlan: transformedDietPlan,
                     },
