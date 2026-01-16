@@ -20,6 +20,8 @@ export const getDailyTracking = query({
         return tracking || {
             waterIntake: 0,
             steps: 0,
+            weight_kg: undefined,
+            distance_km: undefined,
         };
     },
 });
@@ -50,7 +52,7 @@ export const getDailyTrackingByDateRange = query({
 });
 
 /**
- * Mutation to update daily tracking (water and/or steps)
+ * Mutation to update daily tracking (water, steps, weight, and/or distance)
  */
 export const updateDailyTracking = mutation({
     args: {
@@ -58,6 +60,8 @@ export const updateDailyTracking = mutation({
         date: v.string(),
         waterIntake: v.optional(v.number()),
         steps: v.optional(v.number()),
+        weight_kg: v.optional(v.number()),
+        distance_km: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const existing = await ctx.db
@@ -69,10 +73,13 @@ export const updateDailyTracking = mutation({
 
         if (existing) {
             // Update existing record
-            return await ctx.db.patch(existing._id, {
-                waterIntake: args.waterIntake !== undefined ? args.waterIntake : existing.waterIntake,
-                steps: args.steps !== undefined ? args.steps : existing.steps,
-            });
+            const updates: Record<string, any> = {};
+            if (args.waterIntake !== undefined) updates.waterIntake = args.waterIntake;
+            if (args.steps !== undefined) updates.steps = args.steps;
+            if (args.weight_kg !== undefined) updates.weight_kg = args.weight_kg;
+            if (args.distance_km !== undefined) updates.distance_km = args.distance_km;
+            
+            return await ctx.db.patch(existing._id, updates);
         } else {
             // Create new record
             return await ctx.db.insert("daily_tracking", {
@@ -80,6 +87,8 @@ export const updateDailyTracking = mutation({
                 date: args.date,
                 waterIntake: args.waterIntake || 0,
                 steps: args.steps || 0,
+                weight_kg: args.weight_kg,
+                distance_km: args.distance_km,
             });
         }
     },
@@ -112,6 +121,8 @@ export const addWaterIntake = mutation({
                 date: args.date,
                 waterIntake: args.amount,
                 steps: 0,
+                weight_kg: undefined,
+                distance_km: undefined,
             });
         }
     },
@@ -144,6 +155,76 @@ export const updateSteps = mutation({
                 date: args.date,
                 waterIntake: 0,
                 steps: args.steps,
+                weight_kg: undefined,
+                distance_km: undefined,
+            });
+        }
+    },
+});
+
+/**
+ * Mutation to update weight
+ */
+export const updateWeight = mutation({
+    args: {
+        userId: v.id("users"),
+        date: v.string(),
+        weight_kg: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const existing = await ctx.db
+            .query("daily_tracking")
+            .withIndex("by_user_and_date", (q) =>
+                q.eq("userId", args.userId).eq("date", args.date)
+            )
+            .first();
+
+        if (existing) {
+            return await ctx.db.patch(existing._id, {
+                weight_kg: args.weight_kg,
+            });
+        } else {
+            return await ctx.db.insert("daily_tracking", {
+                userId: args.userId,
+                date: args.date,
+                waterIntake: 0,
+                steps: 0,
+                weight_kg: args.weight_kg,
+                distance_km: undefined,
+            });
+        }
+    },
+});
+
+/**
+ * Mutation to update distance (for running/endurance goals)
+ */
+export const updateDistance = mutation({
+    args: {
+        userId: v.id("users"),
+        date: v.string(),
+        distance_km: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const existing = await ctx.db
+            .query("daily_tracking")
+            .withIndex("by_user_and_date", (q) =>
+                q.eq("userId", args.userId).eq("date", args.date)
+            )
+            .first();
+
+        if (existing) {
+            return await ctx.db.patch(existing._id, {
+                distance_km: args.distance_km,
+            });
+        } else {
+            return await ctx.db.insert("daily_tracking", {
+                userId: args.userId,
+                date: args.date,
+                waterIntake: 0,
+                steps: 0,
+                weight_kg: undefined,
+                distance_km: args.distance_km,
             });
         }
     },

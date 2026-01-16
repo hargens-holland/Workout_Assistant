@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Page } from "@/components/layout/Page";
-import { DumbbellIcon, CheckIcon, PlusIcon, ArrowUpRightIcon, PencilIcon, DropletIcon, AppleIcon, MessageSquareIcon, SendIcon, ChevronDownIcon, ChevronUpIcon, TargetIcon, XIcon } from "lucide-react";
+import { DumbbellIcon, CheckIcon, PlusIcon, ArrowUpRightIcon, PencilIcon, DropletIcon, AppleIcon, MessageSquareIcon, SendIcon, ChevronDownIcon, ChevronUpIcon, TargetIcon, XIcon, TrendingUpIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,6 +33,11 @@ const HomePage = () => {
         convexUser?._id ? { userId: convexUser._id } : "skip"
     );
 
+    const goalProgress = useQuery(
+        api.goals.getGoalProgress,
+        convexUser?._id ? { userId: convexUser._id } : "skip"
+    );
+
     const todayMealLogs = useQuery(
         api.mealLogs.getMealLogsByDate,
         convexUser?._id ? { userId: convexUser._id, date: today } : "skip"
@@ -55,12 +60,16 @@ const HomePage = () => {
     const deleteWorkoutSession = useMutation(api.plans.deleteWorkoutSession);
     const chatCommand = useAction(api.chat.chatCommand);
     const updateSteps = useMutation(api.dailyTracking.updateSteps);
+    const updateWeight = useMutation(api.dailyTracking.updateWeight);
+    const updateDistance = useMutation(api.dailyTracking.updateDistance);
 
     const [newMealLog, setNewMealLog] = useState({
         name: "",
         calories: "",
         protein: "",
     });
+
+    const [goalProgressInput, setGoalProgressInput] = useState("");
 
     const [chatMessages, setChatMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
         {
@@ -547,6 +556,213 @@ const HomePage = () => {
                         </Card>
                     </motion.div>
 
+                    {/* Goal Progress Card */}
+                    {goalProgress && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.5 }}
+                            className="lg:col-span-6"
+                        >
+                            <Card className="h-full">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-3 text-xl text-[#E6EAF0]">
+                                        <div className="p-2 bg-gradient-to-br from-[#C7F000]/20 to-[#C7F000]/10 rounded-xl">
+                                            <TrendingUpIcon className="h-5 w-5 text-[#C7F000]" />
+                                        </div>
+                                        Goal Progress
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-6">
+                                        {/* Progress Bar */}
+                                        {goalProgress.currentValue !== null && goalProgress.targetValue !== null && (
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-sm text-[#9AA3B2]">
+                                                        {goalProgress.goal.category === "strength" && goalProgress.goal.target?.exercise && goalProgress.goal.target.exercise}
+                                                        {goalProgress.goal.category === "endurance" && goalProgress.goal.target?.movement && goalProgress.goal.target.movement}
+                                                        {goalProgress.goal.category === "body_composition" && "Weight"}
+                                                    </span>
+                                                    <span className="text-sm font-semibold text-[#E6EAF0]">
+                                                        {goalProgress.goal.category === "body_composition" 
+                                                            ? `${goalProgress.currentValue.toFixed(1)} ${goalProgress.unit} → ${goalProgress.targetValue.toFixed(1)} ${goalProgress.unit}`
+                                                            : `${goalProgress.currentValue.toFixed(goalProgress.goal.category === "endurance" ? 1 : 0)} ${goalProgress.unit} / ${goalProgress.targetValue.toFixed(goalProgress.goal.category === "endurance" ? 1 : 0)} ${goalProgress.unit}`
+                                                        }
+                                                    </span>
+                                                </div>
+                                                <div className="w-full h-4 bg-[#161B22] rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-gradient-to-r from-[#C7F000] to-[#A8D000] rounded-full transition-all duration-500 flex items-center justify-end pr-2"
+                                                        style={{ width: `${Math.min(100, goalProgress.progressPercent)}%` }}
+                                                    >
+                                                        {goalProgress.progressPercent >= 10 && (
+                                                            <span className="text-xs font-semibold text-[#0B0F14]">
+                                                                {Math.round(goalProgress.progressPercent)}%
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {goalProgress.progressPercent < 10 && (
+                                                    <div className="text-right mt-1">
+                                                        <span className="text-xs text-[#9AA3B2]">
+                                                            {Math.round(goalProgress.progressPercent)}%
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Progress Chart */}
+                                        <div>
+                                            <div className="text-sm font-medium text-[#9AA3B2] mb-3">Progress Over Time</div>
+                                            {goalProgress.progressData && goalProgress.progressData.length > 0 ? (
+                                                <div className="relative">
+                                                    {/* Chart Container */}
+                                                    <div className="flex items-end justify-between gap-1 h-48 mb-2 pb-4 border-b border-[#1B212B]">
+                                                        {goalProgress.progressData.slice(-14).map((point, idx) => {
+                                                            const maxValue = Math.max(...goalProgress.progressData.map(p => p.value));
+                                                            const minValue = Math.min(...goalProgress.progressData.map(p => p.value));
+                                                            const range = maxValue - minValue || 1;
+                                                            const heightPercent = ((point.value - minValue) / range) * 100;
+                                                            const isLatest = idx === goalProgress.progressData.slice(-14).length - 1;
+                                                            return (
+                                                                <div key={idx} className="flex-1 flex flex-col items-center gap-1 relative group">
+                                                                    <div
+                                                                        className={cn(
+                                                                            "w-full rounded-t transition-all hover:opacity-80 cursor-pointer",
+                                                                            isLatest 
+                                                                                ? "bg-gradient-to-t from-[#C7F000] to-[#A8D000] ring-2 ring-[#C7F000]/50" 
+                                                                                : "bg-gradient-to-t from-[#C7F000]/80 to-[#A8D000]/80"
+                                                                        )}
+                                                                        style={{ height: `${Math.max(8, heightPercent)}%` }}
+                                                                        title={`${point.value.toFixed(goalProgress.goal.category === "body_composition" ? 1 : 0)} ${goalProgress.unit} on ${new Date(point.date).toLocaleDateString()}`}
+                                                                    />
+                                                                    {/* Tooltip on hover */}
+                                                                    <div className="absolute bottom-full mb-2 hidden group-hover:block bg-[#1B212B] text-[#E6EAF0] text-xs px-2 py-1 rounded whitespace-nowrap z-10 border border-[#C7F000]/20">
+                                                                        {point.value.toFixed(goalProgress.goal.category === "body_composition" ? 1 : 0)} {goalProgress.unit}
+                                                                        <div className="text-[#9AA3B2] text-[10px] mt-0.5">
+                                                                            {new Date(point.date).toLocaleDateString()}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    {/* X-axis labels */}
+                                                    <div className="flex items-end justify-between gap-1 mt-1">
+                                                        {goalProgress.progressData.slice(-14).map((point, idx) => {
+                                                            if (idx % 3 !== 0 && idx !== goalProgress.progressData.slice(-14).length - 1) return null;
+                                                            return (
+                                                                <div key={idx} className="flex-1 text-center">
+                                                                    <div className="text-[10px] text-[#6B7280]">
+                                                                        {new Date(point.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="h-48 flex items-center justify-center border border-[#1B212B] rounded-lg bg-[#161B22]/50">
+                                                    <p className="text-sm text-[#9AA3B2]">No progress data yet. Start tracking to see your progress!</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Stats */}
+                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#1B212B]">
+                                            <div>
+                                                <div className="text-xs text-[#9AA3B2] mb-1">Days Active</div>
+                                                <div className="text-lg font-semibold text-[#E6EAF0]">{goalProgress.daysElapsed}</div>
+                                            </div>
+                                            {goalProgress.currentValue !== null && goalProgress.targetValue !== null && (
+                                                <div>
+                                                    <div className="text-xs text-[#9AA3B2] mb-1">
+                                                        {goalProgress.goal.category === "body_composition" ? "Remaining" : "To Go"}
+                                                    </div>
+                                                    <div className="text-lg font-semibold text-[#E6EAF0]">
+                                                        {goalProgress.goal.category === "body_composition" 
+                                                            ? `${Math.abs(goalProgress.currentValue - goalProgress.targetValue).toFixed(1)} ${goalProgress.unit}`
+                                                            : `${Math.max(0, (goalProgress.targetValue - goalProgress.currentValue)).toFixed(goalProgress.goal.category === "endurance" ? 1 : 0)} ${goalProgress.unit}`
+                                                        }
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Update Progress Input */}
+                                        <div className="pt-4 border-t border-[#1B212B]">
+                                            <div className="text-sm font-medium text-[#9AA3B2] mb-3">
+                                                {goalProgress.goal.category === "body_composition" && "Update Your Weight"}
+                                                {goalProgress.goal.category === "endurance" && "Log Running Distance"}
+                                                {goalProgress.goal.category === "strength" && "Note: Progress updates automatically when you complete workouts"}
+                                            </div>
+                                            {(goalProgress.goal.category === "body_composition" || goalProgress.goal.category === "endurance") && (
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="number"
+                                                        step={goalProgress.goal.category === "body_composition" ? "0.1" : "0.01"}
+                                                        placeholder={goalProgress.goal.category === "body_composition" ? `Weight (${goalProgress.unit})` : `Distance (${goalProgress.unit})`}
+                                                        value={goalProgressInput}
+                                                        onChange={(e) => setGoalProgressInput(e.target.value)}
+                                                        className="flex-1 px-4 py-2 bg-[#161B22] text-[#E6EAF0] placeholder:text-[#6B7280] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C7F000]/20 transition-all"
+                                                    />
+                                                    <Button
+                                                        onClick={async () => {
+                                                            if (!goalProgressInput || !convexUser?._id) return;
+                                                            try {
+                                                                const value = parseFloat(goalProgressInput);
+                                                                if (isNaN(value)) {
+                                                                    alert("Please enter a valid number");
+                                                                    return;
+                                                                }
+                                                                
+                                                                if (goalProgress.goal.category === "body_composition") {
+                                                                    // Convert to kg if unit is lbs
+                                                                    const weightKg = goalProgress.unit.toLowerCase().includes("lb") 
+                                                                        ? value / 2.20462 
+                                                                        : value;
+                                                                    await updateWeight({
+                                                                        userId: convexUser._id,
+                                                                        date: today,
+                                                                        weight_kg: weightKg,
+                                                                    });
+                                                                } else if (goalProgress.goal.category === "endurance") {
+                                                                    // Convert to km if unit is miles
+                                                                    const distanceKm = goalProgress.unit.toLowerCase().includes("mile")
+                                                                        ? value / 0.621371
+                                                                        : value;
+                                                                    await updateDistance({
+                                                                        userId: convexUser._id,
+                                                                        date: today,
+                                                                        distance_km: distanceKm,
+                                                                    });
+                                                                }
+                                                                setGoalProgressInput("");
+                                                            } catch (error) {
+                                                                alert(`Failed to update progress: ${error instanceof Error ? error.message : "Unknown error"}`);
+                                                            }
+                                                        }}
+                                                        size="sm"
+                                                        className="rounded-xl"
+                                                    >
+                                                        Update
+                                                    </Button>
+                                                </div>
+                                            )}
+                                            {goalProgress.goal.category === "strength" && (
+                                                <div className="text-xs text-[#6B7280]">
+                                                    Complete sets with {goalProgress.goal.target?.exercise} in your workouts to automatically track progress.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                    )}
+
                     {/* Daily Meals Card */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -657,14 +873,14 @@ const HomePage = () => {
                         </Card>
                     </motion.div>
 
-                    {/* Chat Card - Under Meals */}
+                    {/* Chat Card - Side by side with Workout */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.55 }}
                         className="lg:col-span-6"
                     >
-                        <Card className="flex flex-col" style={{ maxHeight: "550px" }}>
+                        <Card className="flex flex-col h-full" style={{ maxHeight: "550px" }}>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-3 text-xl text-[#E6EAF0]">
                                     <div className="p-2 bg-[#161B22] rounded-xl">
@@ -728,13 +944,13 @@ const HomePage = () => {
                         </Card>
                     </motion.div>
 
-                    {/* Today's Plan Explanation Panel - Full Width */}
+                    {/* Today's Plan Explanation Panel - Under Chat */}
                     {todayWorkout && (
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.55 }}
-                            className="lg:col-span-12"
+                            transition={{ delay: 0.6 }}
+                            className="lg:col-span-6"
                         >
                             <Card className="h-full">
                                 <CardHeader>
@@ -823,7 +1039,7 @@ const HomePage = () => {
                         </motion.div>
                     )}
 
-                    {/* Today's Workout Card - Large Primary */}
+                    {/* Today's Workout Card - Side by side with Chat */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}

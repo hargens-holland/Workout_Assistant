@@ -69,18 +69,6 @@ const Navbar = () => {
                                     <span>Nutrition</span>
                                 </Link>
 
-                                <Link
-                                    href="/progress"
-                                    className={cn(
-                                        "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
-                                        isActive("/progress")
-                                            ? "bg-[#C7F000]/20 text-[#C7F000]"
-                                            : "text-[#9AA3B2] hover:text-[#E6EAF0] hover:bg-[#161B22]/50"
-                                    )}
-                                >
-                                    <span>Progress</span>
-                                </Link>
-
                                 {/* Icons */}
                                 <div className="ml-4 flex items-center gap-2">
                                     <Link

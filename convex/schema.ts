@@ -185,6 +185,8 @@ export default defineSchema({
         date: v.string(), // ISO date string (YYYY-MM-DD)
         waterIntake: v.number(), // liters
         steps: v.number(), // step count
+        weight_kg: v.optional(v.number()), // weight in kilograms
+        distance_km: v.optional(v.number()), // distance in kilometers (for running/endurance goals)
     })
         .index("by_user_id", ["userId"])
         .index("by_date", ["date"])
