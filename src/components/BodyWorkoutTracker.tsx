@@ -5,6 +5,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { X, TrendingUp, Target, Activity, ChevronRight, Plus } from "lucide-react";
 
 // Map component body parts to database body parts
 const BODY_PART_MAP: Record<string, string> = {
@@ -38,10 +41,10 @@ const DB_TO_COMPONENT_MAP: Record<string, string[]> = {
 // Calculate statistics for each body part
 const calculateStats = (bodyPart: string, workoutData: any) => {
     if (!workoutData || !workoutData.workouts) return { maxLift: 0, average: 0, growth: 0 };
-    
+
     let allWeights: number[] = [];
     let growthRates: number[] = [];
-    
+
     Object.values(workoutData.workouts).forEach((workout: any) => {
         if (Array.isArray(workout)) {
             workout.forEach((entry: any) => allWeights.push(entry.weight));
@@ -53,7 +56,7 @@ const calculateStats = (bodyPart: string, workoutData: any) => {
             }
         }
     });
-    
+
     return {
         maxLift: allWeights.length > 0 ? Math.max(...allWeights) : 0,
         average: allWeights.length > 0 ? allWeights.reduce((a, b) => a + b, 0) / allWeights.length : 0,
@@ -111,6 +114,7 @@ export default function BodyWorkoutTracker({ userId }: BodyWorkoutTrackerProps) 
     const [selectedExercise, setSelectedExercise] = useState<{ id: string; name: string } | null>(null);
     const [logWeight, setLogWeight] = useState("");
     const [logReps, setLogReps] = useState("");
+    const [viewMode, setViewMode] = useState<'front' | 'back'>('front');
 
     // Fetch workout history
     const workoutHistory = useQuery(
@@ -192,15 +196,17 @@ export default function BodyWorkoutTracker({ userId }: BodyWorkoutTrackerProps) 
         return ranked;
     }, [mode, workoutDatabase]);
     
+    // Get color based on ranking - uses CSS variables for theme compatibility
     const getHeatColor = (bodyPart: string) => {
-        if (!rankings[bodyPart]) return '#4a5568';
+        if (!rankings[bodyPart]) return 'hsl(var(--muted-foreground))';
         const percent = rankings[bodyPart].colorPercent;
+        // Green (good) -> Yellow (medium) -> Red (needs work)
         if (percent < 0.33) {
-            return `rgb(${Math.round(239 - percent * 100)}, ${Math.round(68 + percent * 50)}, ${Math.round(68 + percent * 30)})`;
+            return 'hsl(142, 76%, 36%)'; // green
         } else if (percent < 0.66) {
-            return `rgb(${Math.round(180 - (percent - 0.33) * 150)}, ${Math.round(100 + (percent - 0.33) * 80)}, ${Math.round(100 + (percent - 0.33) * 100)})`;
+            return 'hsl(48, 96%, 53%)'; // yellow
         } else {
-            return `rgb(${Math.round(100 - (percent - 0.66) * 80)}, ${Math.round(140 + (percent - 0.66) * 60)}, ${Math.round(200 + (percent - 0.66) * 55)})`;
+            return 'hsl(var(--primary))'; // primary color (usually a brand color)
         }
     };
     
@@ -346,81 +352,70 @@ export default function BodyWorkoutTracker({ userId }: BodyWorkoutTrackerProps) 
         const isHovered = hoveredPoint === `${viewType}-${point.label}`;
         const isSelected = selectedBodyPart === point.id;
         const color = getHeatColor(point.id);
-        
+        const hasData = rankings[point.id]?.maxLift > 0;
+
         return (
             <g
-                style={{ cursor: 'pointer' }}
+                className="cursor-pointer"
                 onMouseEnter={() => setHoveredPoint(`${viewType}-${point.label}`)}
                 onMouseLeave={() => setHoveredPoint(null)}
                 onClick={() => setSelectedBodyPart(point.id)}
             >
+                {/* Outer ring on hover/select */}
                 <circle
                     cx={`${point.x}%`}
                     cy={`${point.y}%`}
-                    r={isHovered || isSelected ? "14" : "10"}
+                    r={isHovered || isSelected ? "12" : "8"}
                     fill="transparent"
                     stroke={color}
-                    strokeWidth="1"
-                    opacity={isHovered || isSelected ? 0.6 : 0.3}
-                    style={{ transition: 'all 0.3s ease' }}
+                    strokeWidth={isHovered || isSelected ? "2" : "1"}
+                    opacity={isHovered || isSelected ? 0.8 : 0.4}
+                    className="transition-all duration-200"
                 />
-                
-                {(isHovered || isSelected) && (
-                    <circle
-                        cx={`${point.x}%`}
-                        cy={`${point.y}%`}
-                        r="18"
-                        fill="transparent"
-                        stroke={color}
-                        strokeWidth="1"
-                        opacity="0.3"
-                        style={{
-                            animation: 'pulse 1.5s ease-in-out infinite',
-                        }}
-                    />
-                )}
-                
+
+                {/* Main dot */}
                 <circle
                     cx={`${point.x}%`}
                     cy={`${point.y}%`}
-                    r={isHovered || isSelected ? "7" : "5"}
-                    fill={color}
+                    r={isHovered || isSelected ? "6" : "4"}
+                    fill={hasData ? color : 'hsl(var(--muted))'}
+                    className="transition-all duration-200"
                     style={{
-                        filter: isHovered || isSelected ? `drop-shadow(0 0 8px ${color})` : `drop-shadow(0 0 4px ${color})`,
-                        transition: 'all 0.3s ease'
+                        filter: isHovered || isSelected ? `drop-shadow(0 0 6px ${color})` : 'none',
                     }}
                 />
-                
+
+                {/* Center highlight */}
                 <circle
                     cx={`${point.x}%`}
                     cy={`${point.y}%`}
-                    r="2"
+                    r="1.5"
                     fill="white"
-                    opacity={isHovered || isSelected ? 1 : 0.7}
+                    opacity={hasData ? 0.9 : 0.5}
                 />
-                
+
+                {/* Tooltip on hover */}
                 {isHovered && (
                     <g>
                         <rect
-                            x={`${point.x - 12}%`}
-                            y={`${point.y - 10}%`}
-                            width="24%"
-                            height="6%"
-                            rx="4"
-                            fill="rgba(0,0,0,0.85)"
-                            stroke={color}
+                            x={`${point.x - 10}%`}
+                            y={`${point.y - 9}%`}
+                            width="20%"
+                            height="5%"
+                            rx="3"
+                            fill="hsl(var(--popover))"
+                            stroke="hsl(var(--border))"
                             strokeWidth="1"
                         />
                         <text
                             x={`${point.x}%`}
-                            y={`${point.y - 6}%`}
+                            y={`${point.y - 5.5}%`}
                             textAnchor="middle"
-                            fill="white"
-                            fontSize="10"
-                            fontWeight="600"
-                            fontFamily="'Rajdhani', sans-serif"
+                            fill="hsl(var(--popover-foreground))"
+                            fontSize="9"
+                            fontWeight="500"
                         >
-                            {point.label.toUpperCase()}
+                            {point.label}
                         </text>
                     </g>
                 )}

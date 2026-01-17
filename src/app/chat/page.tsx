@@ -84,14 +84,14 @@ const ChatPage = () => {
 
     if (!convexUser) {
         return (
-            <div className="fixed inset-0 top-16 bottom-0 flex items-center justify-center bg-[#0B0F14]">
+            <div className="h-full flex items-center justify-center bg-[#0B0F14]">
                 <div className="text-center text-[#9AA3B2]">Loading...</div>
             </div>
         );
     }
 
     return (
-        <div className="fixed inset-0 top-16 bottom-0 flex flex-col bg-[#0B0F14]">
+        <div className="h-full flex flex-col bg-[#0B0F14]">
             {/* Messages Container - Full Height */}
             <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="max-w-4xl mx-auto space-y-6">
