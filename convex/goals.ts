@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { validatePrimaryLiftForGoal } from "./primaryLifts";
+import { generateText } from "./llm";
 
 /**
  * Query to get all goals for a user
@@ -31,17 +32,17 @@ export const getActiveGoal = query({
         console.log("[getActiveGoal] Called with userId:", args.userId);
         const goal = await ctx.db
             .query("goals")
-            .withIndex("by_user_and_active", (q) => 
+            .withIndex("by_user_and_active", (q) =>
                 q.eq("userId", args.userId).eq("isActive", true)
             )
             .first();
-        
-        console.log("[getActiveGoal] Found goal:", goal ? { 
-            _id: goal._id, 
-            category: goal.category, 
-            isActive: goal.isActive 
+
+        console.log("[getActiveGoal] Found goal:", goal ? {
+            _id: goal._id,
+            category: goal.category,
+            isActive: goal.isActive
         } : "null");
-        
+
         // Check if user has any goals at all
         if (!goal) {
             const allGoals = await ctx.db
@@ -50,7 +51,7 @@ export const getActiveGoal = query({
                 .collect();
             console.log("[getActiveGoal] User has", allGoals.length, "total goals (none active)");
         }
-        
+
         return goal;
     },
 });
@@ -87,6 +88,25 @@ export const createGoalMutation = mutation({
         )),
         value: v.optional(v.number()),
         unit: v.optional(v.string()),
+        // Coaching plan fields
+        name: v.optional(v.string()),
+        summary: v.optional(v.string()),
+        reasoning: v.optional(v.string()),
+        programOverview: v.optional(v.object({
+            durationWeeks: v.number(),
+            highLevelStrategy: v.string(),
+        })),
+        phases: v.optional(v.array(v.object({
+            name: v.string(),
+            weeks: v.string(),
+            goal: v.string(),
+            description: v.string(),
+        }))),
+        trainingPrinciples: v.optional(v.object({
+            volumeVsIntensity: v.string(),
+            recoveryAndFatigue: v.string(),
+            stallAdaptation: v.string(),
+        })),
     },
     handler: async (ctx, args) => {
         // Verify user exists
@@ -125,6 +145,13 @@ export const createGoalMutation = mutation({
             value: args.value,
             unit: args.unit,
             isActive: true,
+            // Coaching plan fields (immutable after creation)
+            name: args.name,
+            summary: args.summary,
+            reasoning: args.reasoning,
+            programOverview: args.programOverview,
+            phases: args.phases,
+            trainingPrinciples: args.trainingPrinciples,
         });
     },
 });
@@ -189,7 +216,7 @@ export const createGoal = action({
                         startDate: todayStr,
                         endDate: todayStr,
                     });
-                    
+
                     for (const session of allTodaySessions) {
                         await ctx.runMutation(api.plans.deleteWorkoutSession, {
                             sessionId: session._id,
@@ -199,7 +226,7 @@ export const createGoal = action({
                     console.error(`[createGoal] Failed to delete existing workout:`, error);
                 }
             }
-            
+
             // Generate new workout linked to this goal
             try {
                 await ctx.runAction(api.plans.generateDailyWorkoutAndMeals, {
@@ -347,7 +374,7 @@ export const updateGoal = mutation({
 
         // Determine the category after update (use new category if provided, otherwise existing)
         const updatedCategory = args.category !== undefined ? args.category : goal.category;
-        
+
         // Determine the target after update (use new target if provided, otherwise existing)
         const updatedTarget = args.target !== undefined ? args.target : goal.target;
 
@@ -481,7 +508,7 @@ export const getGoalProgress = query({
     handler: async (ctx, args) => {
         const goal = await ctx.db
             .query("goals")
-            .withIndex("by_user_and_active", (q) => 
+            .withIndex("by_user_and_active", (q) =>
                 q.eq("userId", args.userId).eq("isActive", true)
             )
             .first();
@@ -503,14 +530,14 @@ export const getGoalProgress = query({
             // For strength goals, find the exercise and get max weight
             const exercises = await ctx.db
                 .query("exercises")
-                .filter((q) => 
+                .filter((q) =>
                     q.eq(q.field("name"), goal.target!.exercise!)
                 )
                 .collect();
 
             if (exercises.length > 0) {
                 const exerciseId = exercises[0]._id;
-                
+
                 // Get all workout sessions for this user
                 const sessions = await ctx.db
                     .query("workout_sessions")
@@ -519,7 +546,7 @@ export const getGoalProgress = query({
                     .collect();
 
                 const maxWeights: Array<{ date: string; value: number }> = [];
-                
+
                 for (const session of sessions) {
                     const sets = await ctx.db
                         .query("exercise_sets")
@@ -572,13 +599,13 @@ export const getGoalProgress = query({
                 currentValue = totalDistance;
                 progressData = distances;
             }
-            
+
             unit = unit || "miles";
         } else if (goal.category === "body_composition") {
             // For body composition goals, get weight from daily_tracking or user profile
             const user = await ctx.db.get(args.userId);
             const startWeight = user?.weight_kg || null;
-            
+
             const trackingRecords = await ctx.db
                 .query("daily_tracking")
                 .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
@@ -590,7 +617,7 @@ export const getGoalProgress = query({
             if (trackingRecords.length > 0) {
                 // Get the most recent weight
                 currentValue = trackingRecords[0].weight_kg!;
-                
+
                 // Convert to lbs if unit is lbs
                 if (unit.toLowerCase().includes("lb")) {
                     currentValue = currentValue * 2.20462;
@@ -609,7 +636,7 @@ export const getGoalProgress = query({
                     currentValue = currentValue * 2.20462;
                 }
             }
-            
+
             unit = unit || "lbs";
         }
 
@@ -617,14 +644,14 @@ export const getGoalProgress = query({
         let progressPercent = 0;
         let displayTargetValue = targetValue;
         let startValue: number | null = null;
-        
+
         if (currentValue !== null && targetValue !== null) {
             if (goal.category === "body_composition") {
                 // For body composition, goal.value is the CHANGE amount (lbs/kg to lose or gain)
                 // We need to calculate the actual target weight for display
                 const user = await ctx.db.get(args.userId);
                 startValue = user?.weight_kg ? (unit.toLowerCase().includes("lb") ? user.weight_kg * 2.20462 : user.weight_kg) : currentValue;
-                
+
                 if (goal.direction === "decrease") {
                     // Weight loss: target is startWeight - goal.value
                     displayTargetValue = startValue - targetValue;
@@ -668,5 +695,93 @@ export const getGoalProgress = query({
             progressData: progressData.slice(-30), // Last 30 data points
             startValue,
         };
+    },
+});
+
+/**
+ * Action to create a goal from a chat message
+ * Passes raw message + user profile directly to long-term plan generation
+ * Then extracts and creates the goal from the plan
+ */
+export const createGoalFromChat = action({
+    args: {
+        userId: v.id("users"),
+        message: v.string(),
+    },
+    handler: async (ctx, args): Promise<{ goalId: Id<"goals">; message: string }> => {
+        // Get user profile for context
+        const user = await ctx.runQuery(api.users.getUserById, {
+            userId: args.userId,
+        });
+
+        if (!user) {
+            throw new Error("User not found");
+        }
+
+        try {
+            // Generate long-term plan directly from raw message + profile
+            // This will also extract the goal structure
+            const longTermPlanResult = await ctx.runAction(api.longTermPlans.generation.generateLongTermPlan, {
+                userId: args.userId,
+                goalMessage: args.message,
+                userProfile: {
+                    weight_kg: user.weight_kg,
+                    height_cm: user.height_cm,
+                    experience_level: user.experience_level,
+                    equipment_access: user.equipment_access,
+                },
+            });
+
+            // Extract goal from the plan result
+            if (!longTermPlanResult.goal) {
+                return {
+                    goalId: "" as Id<"goals">,
+                    message: "I couldn't understand your goal. Please be more specific. For example: 'I want to lose 10 pounds' or 'I want to bench press 225 lbs'.",
+                };
+            }
+
+            // Map AI category to schema category
+            const aiCategory = longTermPlanResult.goal.category;
+            let schemaCategory: "body_composition" | "strength" | "endurance" | "mobility" | "skill";
+            if (aiCategory === "fat_loss" || aiCategory === "hypertrophy") {
+                schemaCategory = "body_composition";
+            } else if (aiCategory === "strength") {
+                schemaCategory = "strength";
+            } else if (aiCategory === "endurance") {
+                schemaCategory = "endurance";
+            } else if (aiCategory === "mobility") {
+                schemaCategory = "mobility";
+            } else {
+                schemaCategory = "skill";
+            }
+
+            // Create the goal using the extracted goal structure with coaching plan data
+            const goalId = await ctx.runMutation(api.goals.createGoalMutation, {
+                userId: args.userId,
+                category: schemaCategory,
+                target: longTermPlanResult.goal.target || undefined,
+                direction: longTermPlanResult.goal.direction || undefined,
+                value: longTermPlanResult.goal.value || undefined,
+                unit: longTermPlanResult.goal.unit || undefined,
+                // Store coaching plan data with the goal
+                name: longTermPlanResult.goal.name,
+                summary: longTermPlanResult.goal.summary,
+                reasoning: longTermPlanResult.goal.reasoning,
+                programOverview: longTermPlanResult.programOverview,
+                phases: longTermPlanResult.phases,
+                trainingPrinciples: longTermPlanResult.trainingPrinciples,
+            });
+
+            return {
+                goalId,
+                message: `Goal created successfully! I've set up your ${longTermPlanResult.goal.category} goal and generated your long-term training plan.`,
+            };
+        } catch (error) {
+            console.error("[createGoalFromChat] Error creating goal and plan:", error);
+            return {
+                goalId: "" as Id<"goals">,
+                message: `Error creating goal: ${error instanceof Error ? error.message : "Unknown error"}. Please try again or use the form.`,
+            };
+        }
     },
 });

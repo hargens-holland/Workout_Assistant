@@ -1244,14 +1244,18 @@ export const getWorkoutHistory = query({
             .order("desc")
             .collect();
 
-        const sessions = args.limit ? allSessions.slice(0, args.limit) : allSessions;
-
         const workouts = await Promise.all(
-            sessions.map(async (session) => {
+            allSessions.map(async (session) => {
                 const sets = await ctx.db
                     .query("exercise_sets")
                     .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
                     .collect();
+
+                // Only include workouts where all sets are completed
+                const allSetsCompleted = sets.length > 0 && sets.every((set) => set.completed);
+                if (!allSetsCompleted) {
+                    return null;
+                }
 
                 const exercises = await Promise.all(
                     sets.map(async (set) => {
@@ -1280,15 +1284,25 @@ export const getWorkoutHistory = query({
                     })
                 );
 
+                // Calculate completion metrics
+                const completedSets = sets.filter((set) => set.completed).length;
+                const totalSets = sets.length;
+                const completionRate = totalSets > 0 ? completedSets / totalSets : 0;
+
                 return {
                     ...session,
                     exercises,
                     meals,
+                    completedSets,
+                    totalSets,
+                    completionRate,
                 };
             })
         );
 
-        return workouts;
+        // Filter out null values (incomplete workouts) and apply limit
+        const completedWorkouts = workouts.filter((w): w is NonNullable<typeof w> => w !== null);
+        return args.limit ? completedWorkouts.slice(0, args.limit) : completedWorkouts;
     },
 });
 

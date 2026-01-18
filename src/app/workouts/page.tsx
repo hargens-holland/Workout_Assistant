@@ -246,7 +246,7 @@ const WorkoutsPage = () => {
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-muted-foreground text-center py-12">No workout history.</p>
+                            <p className="text-muted-foreground text-center py-12">No completed workouts yet</p>
                         )}
                     </CardContent>
                 </Card>

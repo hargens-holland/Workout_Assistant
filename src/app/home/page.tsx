@@ -82,6 +82,7 @@ const HomePage = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [collapsedExercises, setCollapsedExercises] = useState<Set<number>>(new Set());
     const [waterExpanded, setWaterExpanded] = useState(false);
+    const [goalExpanded, setGoalExpanded] = useState(false);
 
     // Calculate nutrition stats (default target calories)
     const targetCalories = 2000; // Default, can be computed from goals later
@@ -476,70 +477,164 @@ const HomePage = () => {
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    {activeGoal ? (
-                                        <div className="space-y-4">
-                                            <div className="pt-2">
-                                                <div className="mb-3">
-                                                    <span className="text-xs font-medium text-[#9AA3B2] uppercase tracking-wide">
-                                                        {activeGoal.category === "body_composition" && "Body Composition"}
-                                                        {activeGoal.category === "strength" && "Strength"}
-                                                        {activeGoal.category === "endurance" && "Endurance"}
-                                                        {activeGoal.category === "mobility" && "Mobility"}
-                                                        {activeGoal.category === "skill" && "Skill"}
-                                                    </span>
-                                                </div>
-                                                {activeGoal.category === "body_composition" && activeGoal.direction && (
-                                                    <div>
-                                                        <p className="text-xl font-medium text-[#E6EAF0] mb-1 tracking-tight">
-                                                            {activeGoal.direction.charAt(0).toUpperCase() + activeGoal.direction.slice(1)}
-                                                            {activeGoal.value && activeGoal.unit && ` ${activeGoal.value} ${activeGoal.unit}`}
-                                                        </p>
-                                                    </div>
-                                                )}
-                                                {activeGoal.category === "strength" && activeGoal.target?.exercise && (
-                                                    <div>
-                                                        <p className="text-xl font-medium text-[#E6EAF0] mb-1 tracking-tight">
-                                                            {activeGoal.target.exercise}
-                                                        </p>
-                                                        {activeGoal.target.metric && (
-                                                            <p className="text-sm text-[#9AA3B2] mt-1">
-                                                                Target: {activeGoal.value || "—"} {activeGoal.unit || activeGoal.target.metric}
-                                                            </p>
+                                    {activeGoal ? (() => {
+                                        const hasCoachingPlan = activeGoal.name || activeGoal.summary || activeGoal.reasoning;
+                                        const goalName = activeGoal.name || (
+                                            activeGoal.category === "body_composition" && activeGoal.direction
+                                                ? `${activeGoal.direction.charAt(0).toUpperCase() + activeGoal.direction.slice(1)}${activeGoal.value && activeGoal.unit ? ` ${activeGoal.value} ${activeGoal.unit}` : ""}`
+                                                : activeGoal.category === "strength" && activeGoal.target?.exercise
+                                                    ? activeGoal.target.exercise
+                                                    : activeGoal.category === "endurance" && activeGoal.target?.movement
+                                                        ? activeGoal.target.movement
+                                                        : activeGoal.category === "mobility" && activeGoal.target?.movement
+                                                            ? activeGoal.target.movement
+                                                            : activeGoal.category === "skill" && activeGoal.target?.movement
+                                                                ? activeGoal.target.movement
+                                                                : activeGoal.category === "body_composition" ? "Body Composition"
+                                                                    : activeGoal.category === "strength" ? "Strength"
+                                                                    : activeGoal.category === "endurance" ? "Endurance"
+                                                                    : activeGoal.category === "mobility" ? "Mobility"
+                                                                    : "Skill"
+                                        );
+                                        const categoryLabel = activeGoal.category === "body_composition" ? "Body Composition"
+                                            : activeGoal.category === "strength" ? "Strength"
+                                            : activeGoal.category === "endurance" ? "Endurance"
+                                            : activeGoal.category === "mobility" ? "Mobility"
+                                            : "Skill";
+
+                                        return (
+                                            <div className="space-y-4">
+                                                <div className="pt-2">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <span className="text-xs font-medium text-[#9AA3B2] uppercase tracking-wide">
+                                                            {categoryLabel}
+                                                        </span>
+                                                        {hasCoachingPlan && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon-sm"
+                                                                onClick={() => setGoalExpanded(!goalExpanded)}
+                                                                className="h-6 w-6"
+                                                            >
+                                                                {goalExpanded ? (
+                                                                    <ChevronUpIcon className="h-4 w-4" />
+                                                                ) : (
+                                                                    <ChevronDownIcon className="h-4 w-4" />
+                                                                )}
+                                                            </Button>
                                                         )}
                                                     </div>
-                                                )}
-                                                {activeGoal.category === "endurance" && activeGoal.target?.movement && (
-                                                    <div>
-                                                        <p className="text-xl font-medium text-[#E6EAF0] mb-1 tracking-tight">
-                                                            {activeGoal.target.movement}
-                                                        </p>
-                                                        {activeGoal.target.metric && (
-                                                            <p className="text-sm text-[#9AA3B2] mt-1">
-                                                                Target: {activeGoal.value || "—"} {activeGoal.unit || activeGoal.target.metric}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                {activeGoal.category === "mobility" && activeGoal.target?.movement && (
-                                                    <div>
-                                                        <p className="text-xl font-medium text-[#E6EAF0] mb-1 tracking-tight">
-                                                            {activeGoal.target.movement}
-                                                        </p>
-                                                        {activeGoal.value && activeGoal.unit && (
-                                                            <p className="text-sm text-[#9AA3B2] mt-1">
-                                                                Target: {activeGoal.value} {activeGoal.unit}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                {activeGoal.category === "skill" && activeGoal.target?.movement && (
-                                                    <p className="text-xl font-medium text-[#E6EAF0] tracking-tight">
-                                                        {activeGoal.target.movement}
+                                                    <p className="text-xl font-medium text-[#E6EAF0] mb-1 tracking-tight">
+                                                        {goalName}
                                                     </p>
+                                                    {activeGoal.summary && (
+                                                        <p className="text-sm text-[#9AA3B2] mt-2 leading-relaxed">
+                                                            {activeGoal.summary}
+                                                        </p>
+                                                    )}
+                                                    {!hasCoachingPlan && (
+                                                        <>
+                                                            {activeGoal.category === "body_composition" && activeGoal.direction && activeGoal.value && activeGoal.unit && (
+                                                                <p className="text-sm text-[#9AA3B2] mt-1">
+                                                                    Target: {activeGoal.value} {activeGoal.unit}
+                                                                </p>
+                                                            )}
+                                                            {activeGoal.category === "strength" && activeGoal.target?.exercise && activeGoal.value && activeGoal.unit && (
+                                                                <p className="text-sm text-[#9AA3B2] mt-1">
+                                                                    Target: {activeGoal.value} {activeGoal.unit}
+                                                                </p>
+                                                            )}
+                                                            {activeGoal.category === "endurance" && activeGoal.target?.movement && activeGoal.value && activeGoal.unit && (
+                                                                <p className="text-sm text-[#9AA3B2] mt-1">
+                                                                    Target: {activeGoal.value} {activeGoal.unit}
+                                                                </p>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                                {/* Expanded view with coaching explanation */}
+                                                {goalExpanded && hasCoachingPlan && (
+                                                    <div className="pt-4 border-t border-[#1B212B] space-y-6">
+                                                        {/* Goal Reasoning */}
+                                                        {activeGoal.reasoning && (
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-[#E6EAF0] mb-2">Goal Reasoning</h4>
+                                                                <p className="text-sm text-[#9AA3B2] leading-relaxed whitespace-pre-wrap">
+                                                                    {activeGoal.reasoning}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {/* Program Overview */}
+                                                        {activeGoal.programOverview && (
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-[#E6EAF0] mb-2">Program Overview</h4>
+                                                                <p className="text-sm text-[#9AA3B2] mb-2">
+                                                                    <span className="font-medium">Duration:</span> {activeGoal.programOverview.durationWeeks} weeks
+                                                                </p>
+                                                                <p className="text-sm text-[#9AA3B2] leading-relaxed whitespace-pre-wrap">
+                                                                    {activeGoal.programOverview.highLevelStrategy}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                        {/* Training Phases */}
+                                                        {activeGoal.phases && activeGoal.phases.length > 0 && (
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-[#E6EAF0] mb-3">Training Phases</h4>
+                                                                <div className="space-y-4">
+                                                                    {activeGoal.phases.map((phase: any, idx: number) => (
+                                                                        <div key={idx} className="pl-4 border-l-2 border-[#C7F000]/20">
+                                                                            <div className="flex items-baseline gap-2 mb-1">
+                                                                                <h5 className="text-sm font-medium text-[#E6EAF0]">{phase.name}</h5>
+                                                                                <span className="text-xs text-[#9AA3B2]">({phase.weeks})</span>
+                                                                            </div>
+                                                                            {phase.goal && (
+                                                                                <p className="text-xs font-medium text-[#9AA3B2] mb-1">{phase.goal}</p>
+                                                                            )}
+                                                                            <p className="text-sm text-[#9AA3B2] leading-relaxed whitespace-pre-wrap">
+                                                                                {phase.description}
+                                                                            </p>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {/* Training Principles */}
+                                                        {activeGoal.trainingPrinciples && (
+                                                            <div>
+                                                                <h4 className="text-sm font-semibold text-[#E6EAF0] mb-3">Training Principles</h4>
+                                                                <div className="space-y-4">
+                                                                    {activeGoal.trainingPrinciples.volumeVsIntensity && (
+                                                                        <div>
+                                                                            <h5 className="text-xs font-medium text-[#9AA3B2] mb-1 uppercase tracking-wide">Volume vs Intensity</h5>
+                                                                            <p className="text-sm text-[#9AA3B2] leading-relaxed whitespace-pre-wrap">
+                                                                                {activeGoal.trainingPrinciples.volumeVsIntensity}
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+                                                                    {activeGoal.trainingPrinciples.recoveryAndFatigue && (
+                                                                        <div>
+                                                                            <h5 className="text-xs font-medium text-[#9AA3B2] mb-1 uppercase tracking-wide">Recovery and Fatigue Management</h5>
+                                                                            <p className="text-sm text-[#9AA3B2] leading-relaxed whitespace-pre-wrap">
+                                                                                {activeGoal.trainingPrinciples.recoveryAndFatigue}
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+                                                                    {activeGoal.trainingPrinciples.stallAdaptation && (
+                                                                        <div>
+                                                                            <h5 className="text-xs font-medium text-[#9AA3B2] mb-1 uppercase tracking-wide">Handling Stalls</h5>
+                                                                            <p className="text-sm text-[#9AA3B2] leading-relaxed whitespace-pre-wrap">
+                                                                                {activeGoal.trainingPrinciples.stallAdaptation}
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
-                                        </div>
-                                    ) : (
+                                        );
+                                    })() : (
                                         <div className="text-center py-12">
                                             <TargetIcon className="h-8 w-8 mx-auto mb-3 text-[#6B7280]" />
                                             <p className="text-sm text-[#9AA3B2] mb-4">No active goal</p>

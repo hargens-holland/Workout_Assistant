@@ -249,6 +249,25 @@ export default defineSchema({
         unit: v.optional(v.string()),
         isActive: v.boolean(),
         completed: v.optional(v.boolean()),
+        // Coaching plan fields (stored with goal, immutable after creation)
+        name: v.optional(v.string()),
+        summary: v.optional(v.string()),
+        reasoning: v.optional(v.string()),
+        programOverview: v.optional(v.object({
+            durationWeeks: v.number(),
+            highLevelStrategy: v.string(),
+        })),
+        phases: v.optional(v.array(v.object({
+            name: v.string(),
+            weeks: v.string(),
+            goal: v.string(),
+            description: v.string(),
+        }))),
+        trainingPrinciples: v.optional(v.object({
+            volumeVsIntensity: v.string(),
+            recoveryAndFatigue: v.string(),
+            stallAdaptation: v.string(),
+        })),
     })
         .index("by_user_id", ["userId"])
         .index("by_active", ["isActive"])
