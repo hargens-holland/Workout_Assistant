@@ -60,10 +60,10 @@ export default defineSchema({
                 light: v.number(),
             }),
             recovery_notes: v.string(),
-            split_type: v.optional(v.union(v.literal("PPL"), v.literal("UPPER_LOWER"), v.literal("FULL_BODY"), v.literal("BRO_SPLIT"), v.literal("PUSH_PULL_LEGS_ARMS"))),
+            split_type: v.optional(v.union(v.literal("PPL"), v.literal("UPPER_LOWER"), v.literal("FULL_BODY"), v.literal("BRO_SPLIT"), v.literal("PUSH_PULL_LEGS_ARMS"), v.literal("CHEST_BACK_SHOULDERS_ARMS_LEGS"))),
         })),
         executionConfig: v.optional(v.object({
-            split_type: v.optional(v.union(v.literal("PPL"), v.literal("UPPER_LOWER"), v.literal("FULL_BODY"), v.literal("BRO_SPLIT"), v.literal("PUSH_PULL_LEGS_ARMS"))),
+            split_type: v.optional(v.union(v.literal("PPL"), v.literal("UPPER_LOWER"), v.literal("FULL_BODY"), v.literal("BRO_SPLIT"), v.literal("PUSH_PULL_LEGS_ARMS"), v.literal("CHEST_BACK_SHOULDERS_ARMS_LEGS"))),
             intensity_distribution: v.object({
                 heavy: v.number(),
                 moderate: v.number(),
@@ -105,10 +105,12 @@ export default defineSchema({
 
     exercises: defineTable({
         name: v.string(),
-        bodyPart: v.string(),
+        bodyPart: v.optional(v.string()), // Kept for backward compatibility, use bodyParts instead
+        bodyParts: v.array(v.string()), // Array of body parts this exercise targets
         isCompound: v.boolean(),
         equipment: v.optional(v.string()),
         instructions: v.optional(v.array(v.string())),
+        tutorialImage: v.optional(v.string()), // URL or path to tutorial image/video
     })
         .index("by_body_part", ["bodyPart"])
         .index("by_compound", ["isCompound"]),
@@ -124,16 +126,25 @@ export default defineSchema({
 
     workout_sessions: defineTable({
         userId: v.id("users"),
+        goalId: v.optional(v.id("goals")), // Link workout to specific goal (optional for backward compatibility)
         date: v.string(),
         weekNumber: v.optional(v.number()),
         dayOfWeek: v.optional(v.string()),
         intensity: v.string(),
+        workoutType: v.optional(v.union(
+            v.literal("main"),
+            v.literal("stretch"),
+            v.literal("cardio"),
+            v.literal("endurance")
+        )), // Type of workout: main (lifting), stretch, cardio, or endurance (running/swimming)
         workoutExplanation: v.optional(v.string()), // AI-generated explanation of why this workout was chosen
         mealExplanation: v.optional(v.string()), // AI-generated explanation of why these meals were chosen
     })
         .index("by_user_id", ["userId"])
         .index("by_date", ["date"])
-        .index("by_user_and_date", ["userId", "date"]),
+        .index("by_user_and_date", ["userId", "date"])
+        .index("by_goal_id", ["goalId"])
+        .index("by_user_date_goal", ["userId", "date", "goalId"]),
 
     exercise_sets: defineTable({
         sessionId: v.id("workout_sessions"),
@@ -237,6 +248,7 @@ export default defineSchema({
         value: v.optional(v.number()),
         unit: v.optional(v.string()),
         isActive: v.boolean(),
+        completed: v.optional(v.boolean()),
     })
         .index("by_user_id", ["userId"])
         .index("by_active", ["isActive"])

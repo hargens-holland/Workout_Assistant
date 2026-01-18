@@ -1,0 +1,3295 @@
+[
+    {
+        "name": "Bench Press",
+        "bodyParts": [
+            "chest",
+            "front delts",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "barbell",
+        "instructions": [
+            "Lie flat on bench with feet on floor",
+            "Grip bar slightly wider than shoulder-width",
+            "Lower bar to chest with control",
+            "Press bar up explosively",
+            "Keep core tight throughout movement"
+        ]
+    },
+    {
+        "name": "Incline Bench Press",
+        "bodyParts": [
+            "chest",
+            "front delts",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "barbell",
+        "instructions": [
+            "Set bench to 30-45 degree incline",
+            "Grip bar at shoulder width",
+            "Lower to upper chest",
+            "Press up and slightly forward"
+        ]
+    },
+    {
+        "name": "Dumbbell Press",
+        "bodyParts": [
+            "chest",
+            "front delts",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell",
+        "instructions": [
+            "Lie on flat bench holding dumbbells",
+            "Press dumbbells up until arms are extended",
+            "Lower with control to chest level",
+            "Keep wrists straight throughout"
+        ]
+    },
+    {
+        "name": "Incline Dumbbell Press",
+        "bodyParts": [
+            "chest",
+            "front delts",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Push-ups",
+        "bodyParts": [
+            "chest",
+            "front delts",
+            "triceps",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Start in plank position",
+            "Lower body until chest nearly touches floor",
+            "Push back up to starting position",
+            "Keep body in straight line"
+        ]
+    },
+    {
+        "name": "Chest Fly",
+        "bodyParts": [
+            "chest",
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell",
+        "instructions": [
+            "Lie on bench with dumbbells extended above chest",
+            "Lower weights in wide arc",
+            "Feel stretch in chest",
+            "Bring weights back together above chest"
+        ]
+    },
+    {
+        "name": "Cable Fly",
+        "bodyParts": [
+            "chest",
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "cable"
+    },
+    {
+        "name": "Dips",
+        "bodyParts": [
+            "chest",
+            "triceps",
+            "front delts"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Support body on parallel bars",
+            "Lower body by bending arms",
+            "Push back up to starting position",
+            "Lean forward to target chest"
+        ]
+    },
+    {
+        "name": "Pull-ups",
+        "bodyParts": [
+            "lats",
+            "biceps",
+            "upper back",
+            "rear delts"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Hang from bar with palms facing away",
+            "Pull body up until chin clears bar",
+            "Lower with control",
+            "Keep core engaged"
+        ]
+    },
+    {
+        "name": "Chin-ups",
+        "bodyParts": [
+            "lats",
+            "biceps",
+            "upper back"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Hang from bar with palms facing you",
+            "Pull up focusing on biceps",
+            "Lower slowly"
+        ]
+    },
+    {
+        "name": "Bent-Over Row",
+        "bodyParts": [
+            "upper back",
+            "lats",
+            "biceps",
+            "rear delts"
+        ],
+        "isCompound": true,
+        "equipment": "barbell",
+        "instructions": [
+            "Bend at hips with slight knee bend",
+            "Pull bar to lower chest/upper abdomen",
+            "Squeeze shoulder blades together",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Lat Pulldown",
+        "bodyParts": [
+            "lats",
+            "biceps",
+            "upper back"
+        ],
+        "isCompound": true,
+        "equipment": "cable",
+        "instructions": [
+            "Sit at lat pulldown machine",
+            "Pull bar to upper chest",
+            "Squeeze lats at bottom",
+            "Control the weight up"
+        ]
+    },
+    {
+        "name": "T-Bar Row",
+        "bodyParts": [
+            "upper back",
+            "lats",
+            "biceps",
+            "rear delts"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Seated Cable Row",
+        "bodyParts": [
+            "upper back",
+            "lats",
+            "biceps",
+            "rear delts"
+        ],
+        "isCompound": true,
+        "equipment": "cable",
+        "instructions": [
+            "Sit with feet on platform",
+            "Pull handle to lower chest",
+            "Squeeze shoulder blades",
+            "Return with control"
+        ]
+    },
+    {
+        "name": "Deadlift",
+        "bodyParts": [
+            "hamstrings",
+            "glutes",
+            "lower back",
+            "traps",
+            "lats"
+        ],
+        "isCompound": true,
+        "equipment": "barbell",
+        "instructions": [
+            "Stand with feet hip-width apart",
+            "Bend at hips and knees to grip bar",
+            "Keep back straight, chest up",
+            "Drive through heels to stand",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Romanian Deadlift",
+        "bodyParts": [
+            "hamstrings",
+            "glutes",
+            "lower back"
+        ],
+        "isCompound": true,
+        "equipment": "barbell",
+        "instructions": [
+            "Hold bar with slight knee bend",
+            "Hinge at hips, lower bar",
+            "Feel stretch in hamstrings",
+            "Drive hips forward to return"
+        ]
+    },
+    {
+        "name": "Barbell Row",
+        "bodyParts": [
+            "upper back",
+            "lats",
+            "biceps"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "One-Arm Dumbbell Row",
+        "bodyParts": [
+            "lats",
+            "upper back",
+            "biceps"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "barbell",
+        "instructions": [
+            "Bar on upper back, feet shoulder-width",
+            "Lower by bending hips and knees",
+            "Descend until thighs parallel to floor",
+            "Drive through heels to stand",
+            "Keep chest up and core tight"
+        ]
+    },
+    {
+        "name": "Front Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "barbell",
+        "instructions": [
+            "Bar across front of shoulders",
+            "Elbows up, keep torso upright",
+            "Squat down with control",
+            "Drive up through quads"
+        ]
+    },
+    {
+        "name": "Leg Press",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings"
+        ],
+        "isCompound": true,
+        "equipment": "machine",
+        "instructions": [
+            "Sit in leg press machine",
+            "Place feet shoulder-width on platform",
+            "Lower weight by bending knees",
+            "Press through heels to extend legs"
+        ]
+    },
+    {
+        "name": "Lunges",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Step forward into lunge position",
+            "Lower back knee toward ground",
+            "Front thigh should be parallel",
+            "Push through front heel to return"
+        ]
+    },
+    {
+        "name": "Walking Lunges",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Bulgarian Split Squat",
+        "bodyParts": [
+            "quads",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Leg Curl",
+        "bodyParts": [
+            "hamstrings"
+        ],
+        "isCompound": false,
+        "equipment": "machine",
+        "instructions": [
+            "Lie face down on leg curl machine",
+            "Curl heels toward glutes",
+            "Squeeze hamstrings at top",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Leg Extension",
+        "bodyParts": [
+            "quads"
+        ],
+        "isCompound": false,
+        "equipment": "machine",
+        "instructions": [
+            "Sit in leg extension machine",
+            "Extend legs to lift weight",
+            "Squeeze quads at top",
+            "Lower slowly"
+        ]
+    },
+    {
+        "name": "Calf Raise",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "machine",
+        "instructions": [
+            "Stand on balls of feet",
+            "Rise up onto toes",
+            "Squeeze calves at top",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Standing Calf Raise",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Overhead Press",
+        "bodyParts": [
+            "front delts",
+            "lateral delts",
+            "triceps",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "barbell",
+        "instructions": [
+            "Bar at shoulder level",
+            "Press bar overhead",
+            "Keep core tight",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Dumbbell Shoulder Press",
+        "bodyParts": [
+            "front delts",
+            "lateral delts",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell",
+        "instructions": [
+            "Hold dumbbells at shoulder height",
+            "Press up and slightly forward",
+            "Lower to shoulders"
+        ]
+    },
+    {
+        "name": "Lateral Raise",
+        "bodyParts": [
+            "lateral delts"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell",
+        "instructions": [
+            "Hold dumbbells at sides",
+            "Raise arms out to sides",
+            "Stop at shoulder height",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Front Raise",
+        "bodyParts": [
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell",
+        "instructions": [
+            "Hold dumbbells in front of thighs",
+            "Raise forward to shoulder height",
+            "Lower slowly"
+        ]
+    },
+    {
+        "name": "Rear Delt Fly",
+        "bodyParts": [
+            "rear delts",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell",
+        "instructions": [
+            "Bend forward slightly",
+            "Raise arms out to sides",
+            "Squeeze rear delts",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Face Pull",
+        "bodyParts": [
+            "rear delts",
+            "upper back",
+            "traps"
+        ],
+        "isCompound": false,
+        "equipment": "cable",
+        "instructions": [
+            "Pull cable to face level",
+            "Separate rope handles",
+            "Squeeze rear delts and upper back"
+        ]
+    },
+    {
+        "name": "Barbell Curl",
+        "bodyParts": [
+            "biceps",
+            "forearms"
+        ],
+        "isCompound": false,
+        "equipment": "barbell",
+        "instructions": [
+            "Hold bar with underhand grip",
+            "Curl bar to chest",
+            "Squeeze biceps at top",
+            "Lower slowly"
+        ]
+    },
+    {
+        "name": "Dumbbell Curl",
+        "bodyParts": [
+            "biceps",
+            "forearms"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Hammer Curl",
+        "bodyParts": [
+            "biceps",
+            "forearms"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell",
+        "instructions": [
+            "Hold dumbbells with neutral grip",
+            "Curl without rotating wrists",
+            "Targets brachialis muscle"
+        ]
+    },
+    {
+        "name": "Tricep Dip",
+        "bodyParts": [
+            "triceps",
+            "chest",
+            "front delts"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Support body on bench or bars",
+            "Lower by bending arms",
+            "Push up to starting position"
+        ]
+    },
+    {
+        "name": "Tricep Extension",
+        "bodyParts": [
+            "triceps"
+        ],
+        "isCompound": false,
+        "equipment": "cable",
+        "instructions": [
+            "Pull cable down with rope",
+            "Extend arms fully",
+            "Squeeze triceps",
+            "Return slowly"
+        ]
+    },
+    {
+        "name": "Overhead Tricep Extension",
+        "bodyParts": [
+            "triceps"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Close-Grip Bench Press",
+        "bodyParts": [
+            "triceps",
+            "chest",
+            "front delts"
+        ],
+        "isCompound": true,
+        "equipment": "barbell",
+        "instructions": [
+            "Grip bar closer than shoulder-width",
+            "Lower to lower chest",
+            "Press up focusing on triceps"
+        ]
+    },
+    {
+        "name": "Plank",
+        "bodyParts": [
+            "core",
+            "abs",
+            "obliques"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Hold body in straight line",
+            "Support on forearms and toes",
+            "Keep core tight",
+            "Don't let hips sag"
+        ]
+    },
+    {
+        "name": "Crunches",
+        "bodyParts": [
+            "abs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Lie on back, knees bent",
+            "Curl upper body toward knees",
+            "Squeeze abs",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Russian Twist",
+        "bodyParts": [
+            "abs",
+            "obliques"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Sit with knees bent, lean back",
+            "Rotate torso side to side",
+            "Keep core engaged"
+        ]
+    },
+    {
+        "name": "Leg Raises",
+        "bodyParts": [
+            "abs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Lie on back",
+            "Raise legs straight up",
+            "Lower with control",
+            "Keep lower back pressed to floor"
+        ]
+    },
+    {
+        "name": "Hanging Leg Raise",
+        "bodyParts": [
+            "abs",
+            "hip flexors",
+            "lats"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Hang from pull-up bar",
+            "Raise knees or legs up",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Mountain Climbers",
+        "bodyParts": [
+            "core",
+            "abs",
+            "shoulders"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Bicycle Crunches",
+        "bodyParts": [
+            "abs",
+            "obliques"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Muscle-up",
+        "bodyParts": [
+            "lats",
+            "biceps",
+            "chest",
+            "triceps",
+            "upper back"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Handstand Push-up",
+        "bodyParts": [
+            "front delts",
+            "lateral delts",
+            "triceps",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Pistol Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Farmer's Walk",
+        "bodyParts": [
+            "traps",
+            "forearms",
+            "core",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Shrugs",
+        "bodyParts": [
+            "traps"
+        ],
+        "isCompound": false,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Wrist Curls",
+        "bodyParts": [
+            "forearms"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Reverse Wrist Curls",
+        "bodyParts": [
+            "forearms"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Hip Thrust",
+        "bodyParts": [
+            "glutes",
+            "hamstrings",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Good Morning",
+        "bodyParts": [
+            "hamstrings",
+            "glutes",
+            "lower back"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Sumo Deadlift",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings",
+            "inner thighs"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Chest Stretch",
+        "bodyParts": [
+            "chest",
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Stand in doorway",
+            "Place forearm on doorframe",
+            "Lean forward to feel stretch",
+            "Hold for 30-60 seconds"
+        ]
+    },
+    {
+        "name": "Doorway Chest Stretch",
+        "bodyParts": [
+            "chest",
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Quad Stretch",
+        "bodyParts": [
+            "quads",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Stand and pull heel to glute",
+            "Keep knees together",
+            "Hold for 30-60 seconds",
+            "Switch sides"
+        ]
+    },
+    {
+        "name": "Standing Quad Stretch",
+        "bodyParts": [
+            "quads"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Hamstring Stretch",
+        "bodyParts": [
+            "hamstrings",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Sit with one leg extended",
+            "Reach toward toes",
+            "Feel stretch in back of thigh",
+            "Hold 30-60 seconds"
+        ]
+    },
+    {
+        "name": "Seated Hamstring Stretch",
+        "bodyParts": [
+            "hamstrings"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Standing Hamstring Stretch",
+        "bodyParts": [
+            "hamstrings",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Glute Stretch",
+        "bodyParts": [
+            "glutes",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Lie on back",
+            "Cross one ankle over opposite knee",
+            "Pull knee toward chest",
+            "Hold 30-60 seconds"
+        ]
+    },
+    {
+        "name": "Pigeon Pose",
+        "bodyParts": [
+            "glutes",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Hip Flexor Stretch",
+        "bodyParts": [
+            "hip flexors",
+            "quads"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Kneel in lunge position",
+            "Push hips forward",
+            "Feel stretch in front of hip",
+            "Hold 30-60 seconds"
+        ]
+    },
+    {
+        "name": "Kneeling Hip Flexor Stretch",
+        "bodyParts": [
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Calf Stretch",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Step one foot back",
+            "Keep back leg straight",
+            "Lean forward to feel stretch",
+            "Hold 30-60 seconds"
+        ]
+    },
+    {
+        "name": "Wall Calf Stretch",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Shoulder Stretch",
+        "bodyParts": [
+            "front delts",
+            "chest"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Bring arm across body",
+            "Use other arm to pull gently",
+            "Feel stretch in shoulder",
+            "Hold 30-60 seconds"
+        ]
+    },
+    {
+        "name": "Cross-Body Shoulder Stretch",
+        "bodyParts": [
+            "rear delts",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Tricep Stretch",
+        "bodyParts": [
+            "triceps"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Raise arm overhead",
+            "Bend elbow, hand behind head",
+            "Use other hand to pull elbow",
+            "Hold 30-60 seconds"
+        ]
+    },
+    {
+        "name": "Bicep Stretch",
+        "bodyParts": [
+            "biceps",
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Extend arm straight",
+            "Place hand on wall",
+            "Turn body away from wall",
+            "Feel stretch in bicep"
+        ]
+    },
+    {
+        "name": "Upper Back Stretch",
+        "bodyParts": [
+            "upper back",
+            "lats"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Sit or stand",
+            "Clasp hands in front",
+            "Round upper back",
+            "Feel stretch between shoulder blades"
+        ]
+    },
+    {
+        "name": "Lat Stretch",
+        "bodyParts": [
+            "lats"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Kneel and reach forward",
+            "Sit back on heels",
+            "Feel stretch in side of back",
+            "Hold 30-60 seconds"
+        ]
+    },
+    {
+        "name": "Lower Back Stretch",
+        "bodyParts": [
+            "lower back",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Lie on back",
+            "Bring knees to chest",
+            "Hold and rock gently",
+            "Feel stretch in lower back"
+        ]
+    },
+    {
+        "name": "Child's Pose",
+        "bodyParts": [
+            "lower back",
+            "upper back",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Cat-Cow Stretch",
+        "bodyParts": [
+            "lower back",
+            "upper back",
+            "core"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Start on hands and knees",
+            "Arch back (cow)",
+            "Round back (cat)",
+            "Repeat 10-15 times"
+        ]
+    },
+    {
+        "name": "Spinal Twist",
+        "bodyParts": [
+            "lower back",
+            "obliques",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Neck Stretch",
+        "bodyParts": [
+            "traps",
+            "neck"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Tilt head to one side",
+            "Use hand to gently pull",
+            "Feel stretch in side of neck",
+            "Hold 30 seconds"
+        ]
+    },
+    {
+        "name": "Wrist Stretch",
+        "bodyParts": [
+            "forearms"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Extend arm, palm down",
+            "Pull fingers back with other hand",
+            "Feel stretch in forearm",
+            "Hold 30 seconds"
+        ]
+    },
+    {
+        "name": "Butterfly Stretch",
+        "bodyParts": [
+            "inner thighs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Sit with soles of feet together",
+            "Pull feet toward body",
+            "Gently press knees down",
+            "Feel stretch in inner thighs"
+        ]
+    },
+    {
+        "name": "Figure-Four Stretch",
+        "bodyParts": [
+            "glutes",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Lunge Stretch",
+        "bodyParts": [
+            "hip flexors",
+            "quads",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Standing Forward Fold",
+        "bodyParts": [
+            "hamstrings",
+            "calves",
+            "lower back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Seated Forward Fold",
+        "bodyParts": [
+            "hamstrings",
+            "lower back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "World's Greatest Stretch",
+        "bodyParts": [
+            "hip flexors",
+            "hamstrings",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Start in lunge position",
+            "Place opposite hand on floor",
+            "Rotate torso and reach up",
+            "Switch sides"
+        ]
+    },
+    {
+        "name": "90/90 Stretch",
+        "bodyParts": [
+            "hip flexors",
+            "glutes",
+            "inner thighs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Cobra Stretch",
+        "bodyParts": [
+            "lower back",
+            "abs",
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Lie face down",
+            "Push up with arms",
+            "Arch back gently",
+            "Feel stretch in front of body"
+        ]
+    },
+    {
+        "name": "Sphinx Pose",
+        "bodyParts": [
+            "lower back",
+            "abs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Thread the Needle",
+        "bodyParts": [
+            "upper back",
+            "rear delts",
+            "lats"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Eagle Arms",
+        "bodyParts": [
+            "upper back",
+            "rear delts",
+            "traps"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Wall Angels",
+        "bodyParts": [
+            "upper back",
+            "rear delts",
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Stand with back against wall",
+            "Raise arms to form 'W'",
+            "Slide arms up to 'Y'",
+            "Return to 'W' position"
+        ]
+    },
+    {
+        "name": "IT Band Stretch",
+        "bodyParts": [
+            "outer thighs",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Piriformis Stretch",
+        "bodyParts": [
+            "glutes",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Ankle Circles",
+        "bodyParts": [
+            "ankles",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Wrist Circles",
+        "bodyParts": [
+            "forearms",
+            "wrists"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Shoulder Circles",
+        "bodyParts": [
+            "front delts",
+            "lateral delts",
+            "rear delts"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Hip Circles",
+        "bodyParts": [
+            "hip flexors",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Neck Rolls",
+        "bodyParts": [
+            "neck",
+            "traps"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Arm Circles",
+        "bodyParts": [
+            "front delts",
+            "lateral delts",
+            "rear delts"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Leg Swings",
+        "bodyParts": [
+            "hip flexors",
+            "hamstrings",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Torso Twists",
+        "bodyParts": [
+            "obliques",
+            "lower back",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Side Bend",
+        "bodyParts": [
+            "obliques",
+            "lats"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Hip Abduction Stretch",
+        "bodyParts": [
+            "outer thighs",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Hip Adduction Stretch",
+        "bodyParts": [
+            "inner thighs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Runner's Lunge",
+        "bodyParts": [
+            "hip flexors",
+            "quads",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Lizard Pose",
+        "bodyParts": [
+            "hip flexors",
+            "inner thighs",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Reclining Hand-to-Big-Toe Pose",
+        "bodyParts": [
+            "hamstrings",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Supine Spinal Twist",
+        "bodyParts": [
+            "lower back",
+            "obliques",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Happy Baby",
+        "bodyParts": [
+            "inner thighs",
+            "hip flexors",
+            "lower back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Reclining Bound Angle",
+        "bodyParts": [
+            "inner thighs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Extended Puppy Pose",
+        "bodyParts": [
+            "upper back",
+            "lats",
+            "shoulders"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Downward Dog",
+        "bodyParts": [
+            "hamstrings",
+            "calves",
+            "shoulders",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Upward Dog",
+        "bodyParts": [
+            "lower back",
+            "abs",
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Warrior I",
+        "bodyParts": [
+            "hip flexors",
+            "quads",
+            "calves",
+            "shoulders"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Warrior II",
+        "bodyParts": [
+            "hip flexors",
+            "quads",
+            "inner thighs",
+            "shoulders"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Triangle Pose",
+        "bodyParts": [
+            "obliques",
+            "hamstrings",
+            "inner thighs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Half Pigeon",
+        "bodyParts": [
+            "glutes",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Seated Spinal Twist",
+        "bodyParts": [
+            "lower back",
+            "obliques",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Bridge Pose",
+        "bodyParts": [
+            "glutes",
+            "hamstrings",
+            "lower back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Reclining Hero",
+        "bodyParts": [
+            "quads",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Seated Wide-Legged Forward Fold",
+        "bodyParts": [
+            "inner thighs",
+            "hamstrings"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Bound Angle Pose",
+        "bodyParts": [
+            "inner thighs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Revolved Triangle",
+        "bodyParts": [
+            "obliques",
+            "hamstrings",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Extended Side Angle",
+        "bodyParts": [
+            "obliques",
+            "quads",
+            "inner thighs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Low Lunge",
+        "bodyParts": [
+            "hip flexors",
+            "quads",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "High Lunge",
+        "bodyParts": [
+            "hip flexors",
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Pyramid Pose",
+        "bodyParts": [
+            "hamstrings",
+            "calves",
+            "lower back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Intense Side Stretch",
+        "bodyParts": [
+            "hamstrings",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Standing Split",
+        "bodyParts": [
+            "hamstrings",
+            "calves",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Revolved Head-to-Knee",
+        "bodyParts": [
+            "obliques",
+            "hamstrings",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Head-to-Knee Forward Bend",
+        "bodyParts": [
+            "hamstrings",
+            "lower back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Marichyasana C",
+        "bodyParts": [
+            "obliques",
+            "upper back",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Half Lord of the Fishes",
+        "bodyParts": [
+            "obliques",
+            "upper back",
+            "lower back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Cow Face Arms",
+        "bodyParts": [
+            "rear delts",
+            "triceps",
+            "lats"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Reverse Prayer",
+        "bodyParts": [
+            "rear delts",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Garland Pose",
+        "bodyParts": [
+            "ankles",
+            "calves",
+            "hip flexors",
+            "inner thighs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Frog Pose",
+        "bodyParts": [
+            "inner thighs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Fire Log Pose",
+        "bodyParts": [
+            "outer hips",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Double Pigeon",
+        "bodyParts": [
+            "outer hips",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Reclining Twist",
+        "bodyParts": [
+            "lower back",
+            "obliques",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Knee-to-Chest",
+        "bodyParts": [
+            "lower back",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Supine Twist",
+        "bodyParts": [
+            "lower back",
+            "obliques"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Seated Twist",
+        "bodyParts": [
+            "obliques",
+            "upper back",
+            "lower back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Standing Twist",
+        "bodyParts": [
+            "obliques",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Side Plank",
+        "bodyParts": [
+            "obliques",
+            "core",
+            "shoulders"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Dead Bug",
+        "bodyParts": [
+            "core",
+            "abs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Bird Dog",
+        "bodyParts": [
+            "core",
+            "lower back",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Hollow Body Hold",
+        "bodyParts": [
+            "core",
+            "abs"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "L-Sit",
+        "bodyParts": [
+            "core",
+            "abs",
+            "hip flexors",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Dragon Flag",
+        "bodyParts": [
+            "core",
+            "abs",
+            "hip flexors"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Ab Wheel Rollout",
+        "bodyParts": [
+            "core",
+            "abs",
+            "front delts"
+        ],
+        "isCompound": true,
+        "equipment": "ab wheel"
+    },
+    {
+        "name": "Pallof Press",
+        "bodyParts": [
+            "core",
+            "obliques"
+        ],
+        "isCompound": false,
+        "equipment": "cable"
+    },
+    {
+        "name": "Cable Crunch",
+        "bodyParts": [
+            "abs"
+        ],
+        "isCompound": false,
+        "equipment": "cable"
+    },
+    {
+        "name": "Hanging Knee Raise",
+        "bodyParts": [
+            "abs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Toes-to-Bar",
+        "bodyParts": [
+            "abs",
+            "hip flexors",
+            "lats"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "V-Ups",
+        "bodyParts": [
+            "abs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Flutter Kicks",
+        "bodyParts": [
+            "abs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Scissor Kicks",
+        "bodyParts": [
+            "abs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Reverse Crunches",
+        "bodyParts": [
+            "abs",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Side Crunches",
+        "bodyParts": [
+            "obliques",
+            "abs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Woodchoppers",
+        "bodyParts": [
+            "obliques",
+            "core"
+        ],
+        "isCompound": false,
+        "equipment": "cable"
+    },
+    {
+        "name": "Cable Side Bend",
+        "bodyParts": [
+            "obliques"
+        ],
+        "isCompound": false,
+        "equipment": "cable"
+    },
+    {
+        "name": "Oblique Crunches",
+        "bodyParts": [
+            "obliques"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Side Plank Crunches",
+        "bodyParts": [
+            "obliques",
+            "core"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Turkish Get-Up",
+        "bodyParts": [
+            "core",
+            "shoulders",
+            "quads",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "kettlebell"
+    },
+    {
+        "name": "Kettlebell Swing",
+        "bodyParts": [
+            "glutes",
+            "hamstrings",
+            "core",
+            "traps"
+        ],
+        "isCompound": true,
+        "equipment": "kettlebell"
+    },
+    {
+        "name": "Goblet Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Bulgarian Split Squat",
+        "bodyParts": [
+            "quads",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Step-Ups",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Romanian Deadlift",
+        "bodyParts": [
+            "hamstrings",
+            "glutes",
+            "lower back"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Single-Leg Deadlift",
+        "bodyParts": [
+            "hamstrings",
+            "glutes",
+            "lower back",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Calf Raises",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Seated Calf Raise",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "machine"
+    },
+    {
+        "name": "Donkey Calf Raise",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "machine"
+    },
+    {
+        "name": "Calf Stretch on Step",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Wall Sit",
+        "bodyParts": [
+            "quads",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Jump Squats",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Box Jumps",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Broad Jumps",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Glute Bridge",
+        "bodyParts": [
+            "glutes",
+            "hamstrings",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Clamshells",
+        "bodyParts": [
+            "glutes",
+            "outer thighs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Fire Hydrants",
+        "bodyParts": [
+            "glutes",
+            "outer thighs"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Donkey Kicks",
+        "bodyParts": [
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Glute Bridges",
+        "bodyParts": [
+            "glutes",
+            "hamstrings",
+            "lower back"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Calf Raise",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Calf Raises on Leg Press",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "machine"
+    },
+    {
+        "name": "Leg Press Calf Raise",
+        "bodyParts": [
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "machine"
+    },
+    {
+        "name": "Seated Leg Curl",
+        "bodyParts": [
+            "hamstrings"
+        ],
+        "isCompound": false,
+        "equipment": "machine"
+    },
+    {
+        "name": "Lying Leg Curl",
+        "bodyParts": [
+            "hamstrings"
+        ],
+        "isCompound": false,
+        "equipment": "machine"
+    },
+    {
+        "name": "Nordic Curls",
+        "bodyParts": [
+            "hamstrings",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Good Mornings",
+        "bodyParts": [
+            "hamstrings",
+            "glutes",
+            "lower back"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Stiff-Leg Deadlift",
+        "bodyParts": [
+            "hamstrings",
+            "glutes",
+            "lower back"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Sumo Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "inner thighs"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Hack Squat",
+        "bodyParts": [
+            "quads",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "machine"
+    },
+    {
+        "name": "Sissy Squat",
+        "bodyParts": [
+            "quads"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Jumping Lunges",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Reverse Lunges",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Lateral Lunges",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "inner thighs"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Curtsy Lunges",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "inner thighs"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Overhead Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "shoulders",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Zercher Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "core",
+            "biceps"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Jefferson Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Belt Squat",
+        "bodyParts": [
+            "quads",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "machine"
+    },
+    {
+        "name": "Pause Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Tempo Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Box Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Heels-Elevated Squat",
+        "bodyParts": [
+            "quads",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Narrow Stance Squat",
+        "bodyParts": [
+            "quads"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Wide Stance Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "inner thighs"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    },
+    {
+        "name": "Jump Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Pistol Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "hamstrings",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Shrimp Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Dragon Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "core",
+            "hip flexors"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Cossack Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "inner thighs",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Skater Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Chair-Assisted Pistol Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Assisted Pistol Squat",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Jumping Jacks",
+        "bodyParts": [
+            "calves",
+            "shoulders",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Burpees",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "chest",
+            "triceps",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Mountain Climbers",
+        "bodyParts": [
+            "core",
+            "abs",
+            "shoulders",
+            "quads"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "High Knees",
+        "bodyParts": [
+            "quads",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Butt Kicks",
+        "bodyParts": [
+            "hamstrings",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Jump Rope",
+        "bodyParts": [
+            "calves",
+            "shoulders",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "jump rope"
+    },
+    {
+        "name": "Bear Crawl",
+        "bodyParts": [
+            "core",
+            "shoulders",
+            "quads",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Crab Walk",
+        "bodyParts": [
+            "glutes",
+            "triceps",
+            "shoulders",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Duck Walk",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Lateral Shuffle",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Carioca",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "A-Skips",
+        "bodyParts": [
+            "quads",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "B-Skips",
+        "bodyParts": [
+            "quads",
+            "hamstrings",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Straight-Leg Bounds",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Hops",
+        "bodyParts": [
+            "quads",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Lateral Bounds",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Tuck Jumps",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Star Jumps",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "shoulders",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Squat Jumps",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Lunge Jumps",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Broad Jump",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Broad Jump",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Triple Jump",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Standing Long Jump",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Vertical Jump",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Vertical Jump",
+        "bodyParts": [
+            "quads",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Depth Jump",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Depth Jump",
+        "bodyParts": [
+            "quads",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Lateral Jump",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "180-Degree Jump",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "360-Degree Jump",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Hop",
+        "bodyParts": [
+            "quads",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Lateral Hop",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Forward Hop",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Backward Hop",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Lateral Hop",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Forward Hop",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Backward Hop",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Alternating Leg Bounds",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Single-Leg Bounds",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Double-Leg Bounds",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Triple-Leg Bounds",
+        "bodyParts": [
+            "quads",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Chest Press",
+        "bodyParts": [
+            "chest",
+            "front delts",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "machine"
+    },
+    {
+        "name": "Dumbbell Chest Press",
+        "bodyParts": [
+            "chest",
+            "front delts",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Shoulder Press",
+        "bodyParts": [
+            "front delts",
+            "lateral delts",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "machine"
+    },
+    {
+        "name": "Incline Dumbbell Chest Press",
+        "bodyParts": [
+            "chest",
+            "front delts",
+            "triceps"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Chest Cable Fly",
+        "bodyParts": [
+            "chest",
+            "front delts"
+        ],
+        "isCompound": false,
+        "equipment": "cable"
+    },
+    {
+        "name": "Pull Ups",
+        "bodyParts": [
+            "lats",
+            "biceps",
+            "upper back",
+            "rear delts"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Chin Ups",
+        "bodyParts": [
+            "lats",
+            "biceps",
+            "upper back"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Dumbbell Row",
+        "bodyParts": [
+            "upper back",
+            "lats",
+            "biceps",
+            "rear delts"
+        ],
+        "isCompound": true,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Split Squat",
+        "bodyParts": [
+            "quads",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Sit-ups",
+        "bodyParts": [
+            "abs",
+            "obliques",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Lie on back with knees bent",
+            "Place hands behind head or crossed on chest",
+            "Curl upper body toward knees",
+            "Lower with control"
+        ]
+    },
+    {
+        "name": "Sit Ups",
+        "bodyParts": [
+            "abs",
+            "obliques",
+            "hip flexors"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Handstand",
+        "bodyParts": [
+            "front delts",
+            "lateral delts",
+            "core",
+            "upper back"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Start in downward dog position",
+            "Walk feet closer to hands",
+            "Kick one leg up, then the other",
+            "Balance on hands with body straight",
+            "Hold position"
+        ]
+    },
+    {
+        "name": "Running",
+        "bodyParts": [
+            "cardio",
+            "quads",
+            "hamstrings",
+            "calves",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Start with warm-up walk",
+            "Gradually increase pace to running speed",
+            "Maintain steady breathing",
+            "Land on midfoot, not heel",
+            "Keep posture upright"
+        ]
+    },
+    {
+        "name": "Walking",
+        "bodyParts": [
+            "cardio",
+            "quads",
+            "hamstrings",
+            "calves",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Incline Walk",
+        "bodyParts": [
+            "cardio",
+            "quads",
+            "hamstrings",
+            "calves",
+            "glutes"
+        ],
+        "isCompound": true,
+        "equipment": "treadmill"
+    },
+    {
+        "name": "Swimming",
+        "bodyParts": [
+            "cardio",
+            "lats",
+            "shoulders",
+            "core",
+            "quads",
+            "hamstrings"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Biking",
+        "bodyParts": [
+            "cardio",
+            "quads",
+            "hamstrings",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bike"
+    },
+    {
+        "name": "Cycling",
+        "bodyParts": [
+            "cardio",
+            "quads",
+            "hamstrings",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "bike"
+    },
+    {
+        "name": "Rowing",
+        "bodyParts": [
+            "cardio",
+            "lats",
+            "upper back",
+            "quads",
+            "hamstrings",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "rowing machine"
+    },
+    {
+        "name": "Stair Climber",
+        "bodyParts": [
+            "cardio",
+            "quads",
+            "glutes",
+            "calves",
+            "hamstrings"
+        ],
+        "isCompound": true,
+        "equipment": "machine"
+    },
+    {
+        "name": "Elliptical",
+        "bodyParts": [
+            "cardio",
+            "quads",
+            "hamstrings",
+            "glutes",
+            "calves"
+        ],
+        "isCompound": true,
+        "equipment": "machine"
+    },
+    {
+        "name": "Hiking",
+        "bodyParts": [
+            "cardio",
+            "quads",
+            "hamstrings",
+            "glutes",
+            "calves",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Ankle Circles",
+        "bodyParts": [
+            "ankles",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight",
+        "instructions": [
+            "Sit or stand",
+            "Rotate ankle in circles",
+            "10 circles clockwise, 10 counterclockwise",
+            "Switch sides"
+        ]
+    },
+    {
+        "name": "Ankle Flexion",
+        "bodyParts": [
+            "ankles",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Ankle Extension",
+        "bodyParts": [
+            "ankles",
+            "calves"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Neck Stretch Side",
+        "bodyParts": [
+            "neck",
+            "traps"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Neck Stretch Forward",
+        "bodyParts": [
+            "neck",
+            "upper back"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Outer Hip Stretch",
+        "bodyParts": [
+            "outer hips",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Outer Hip Strengthening",
+        "bodyParts": [
+            "outer hips",
+            "glutes"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Wrist Flexion Stretch",
+        "bodyParts": [
+            "wrists",
+            "forearms"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Wrist Extension Stretch",
+        "bodyParts": [
+            "wrists",
+            "forearms"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Wrist Circles",
+        "bodyParts": [
+            "wrists",
+            "forearms"
+        ],
+        "isCompound": false,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "Lateral Deltoid Raise",
+        "bodyParts": [
+            "lateral delts"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Cable Lateral Raise",
+        "bodyParts": [
+            "lateral delts"
+        ],
+        "isCompound": false,
+        "equipment": "cable"
+    },
+    {
+        "name": "Bent-Over Lateral Raise",
+        "bodyParts": [
+            "lateral delts",
+            "rear delts"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Prone Lateral Raise",
+        "bodyParts": [
+            "lateral delts",
+            "rear delts"
+        ],
+        "isCompound": false,
+        "equipment": "dumbbell"
+    },
+    {
+        "name": "Push Ups",
+        "bodyParts": [
+            "chest",
+            "front delts",
+            "triceps",
+            "core"
+        ],
+        "isCompound": true,
+        "equipment": "bodyweight"
+    },
+    {
+        "name": "RDL",
+        "bodyParts": [
+            "hamstrings",
+            "glutes",
+            "lower back"
+        ],
+        "isCompound": true,
+        "equipment": "barbell"
+    }
+]

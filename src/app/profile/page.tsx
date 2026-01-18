@@ -1,9 +1,10 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import ProfileHeader from "@/components/ProfileHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,8 +22,94 @@ import {
 } from "@/components/ui/accordion";
 import { GoalForm, type Goal } from "@/components/GoalForm";
 
+// Split selector component
+const SplitSelector = ({ currentSplit, userId, currentPreferences }: { 
+    currentSplit: SplitType | undefined; 
+    userId: string;
+    currentPreferences: any;
+}) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [selectedSplit, setSelectedSplit] = useState<SplitType>(currentSplit || "PPL");
+    const updateProfile = useMutation(api.users.updateProfile);
+
+    const splitOptions: { value: SplitType; label: string }[] = [
+        { value: "PPL", label: "Push/Pull/Legs" },
+        { value: "UPPER_LOWER", label: "Upper/Lower" },
+        { value: "FULL_BODY", label: "Full Body" },
+        { value: "BRO_SPLIT", label: "Bro Split" },
+        { value: "PUSH_PULL_LEGS_ARMS", label: "Push/Pull/Legs/Arms" },
+    ];
+
+    const handleSave = async () => {
+        try {
+            // Merge with existing preferences to preserve other settings
+            const updatedPreferences = {
+                ...currentPreferences,
+                preferred_split: selectedSplit,
+            };
+            await updateProfile({
+                userId: userId as any,
+                preferences: updatedPreferences,
+            });
+            setIsEditing(false);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : "Failed to update split");
+        }
+    };
+
+    if (isEditing) {
+        return (
+            <div className="space-y-2">
+                <select
+                    value={selectedSplit}
+                    onChange={(e) => setSelectedSplit(e.target.value as SplitType)}
+                    className="w-full px-3 py-2 border rounded-lg bg-background"
+                >
+                    {splitOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
+                <div className="flex gap-2">
+                    <Button onClick={handleSave} size="sm" variant="default">
+                        Save
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            setIsEditing(false);
+                            setSelectedSplit(currentSplit || "PPL");
+                        }}
+                        size="sm"
+                        variant="outline"
+                    >
+                        Cancel
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center gap-2">
+            <div className="font-semibold">
+                {currentSplit ? splitOptions.find((o) => o.value === currentSplit)?.label || currentSplit : "Not set"}
+            </div>
+            <Button
+                onClick={() => setIsEditing(true)}
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2"
+            >
+                <PencilIcon className="h-3 w-3" />
+            </Button>
+        </div>
+    );
+};
+
 const ProfilePage = () => {
     const { user } = useUser();
+    const router = useRouter();
 
     const convexUser = useQuery(
         api.users.getUserByClerkId,
@@ -40,7 +127,7 @@ const ProfilePage = () => {
         api.goals.getActiveGoal,
         convexUser?._id ? { userId: convexUser._id } : "skip"
     );
-    const createGoal = useMutation(api.goals.createGoal);
+    const createGoal = useAction(api.goals.createGoal);
     const updateGoal = useMutation(api.goals.updateGoal);
     const deleteGoal = useMutation(api.goals.deleteGoal);
     const setActiveGoal = useMutation(api.goals.setActiveGoal);
@@ -50,9 +137,12 @@ const ProfilePage = () => {
 
     // Plan-related handlers removed - plans are deprecated
 
-    const handleSaveGoal = async (goal: Goal) => {
-        if (!convexUser?._id) return;
+    const [isSavingGoal, setIsSavingGoal] = useState(false);
 
+    const handleSaveGoal = async (goal: Goal) => {
+        if (!convexUser?._id || isSavingGoal) return;
+
+        setIsSavingGoal(true);
         try {
             if (editingGoalId) {
                 // Update existing goal
@@ -78,8 +168,14 @@ const ProfilePage = () => {
             }
             setShowGoalForm(false);
             setEditingGoalId(null);
+            // Redirect to home page after creating a new goal
+            if (!editingGoalId) {
+                router.push("/");
+            }
         } catch (error) {
             alert(error instanceof Error ? error.message : "Failed to save goal");
+        } finally {
+            setIsSavingGoal(false);
         }
     };
 
@@ -141,10 +237,12 @@ const ProfilePage = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-sm font-medium text-muted-foreground mb-1">Preferred Split</div>
-                                    <div className="font-semibold">
-                                        {convexUser.preferences?.preferred_split || "Not set"}
-                                    </div>
+                                    <div className="text-sm font-medium text-muted-foreground mb-2">Preferred Split</div>
+                                    <SplitSelector
+                                        currentSplit={convexUser.preferences?.preferred_split as SplitType | undefined}
+                                        userId={convexUser._id}
+                                        currentPreferences={convexUser.preferences || {}}
+                                    />
                                 </div>
                                 <div>
                                     <div className="text-sm font-medium text-muted-foreground mb-1">Injuries / Limitations</div>
@@ -204,6 +302,7 @@ const ProfilePage = () => {
                                     setShowGoalForm(false);
                                     setEditingGoalId(null);
                                 }}
+                                isLoading={isSavingGoal}
                             />
                         ) : (
                             <div className="space-y-3">

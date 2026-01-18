@@ -194,7 +194,11 @@ const ExercisesAdminPage = () => {
                                 >
                                     <div className="font-semibold">{exercise.name}</div>
                                     <div className="text-xs text-muted-foreground space-y-1 mt-1">
-                                        <div className="capitalize">{exercise.bodyPart}</div>
+                                        <div className="capitalize">
+                                            {(exercise.bodyParts && exercise.bodyParts.length > 0)
+                                                ? exercise.bodyParts.join(", ")
+                                                : exercise.bodyPart || "N/A"}
+                                        </div>
                                         <div className="flex items-center gap-2">
                                             {exercise.isCompound && (
                                                 <span className="px-2 py-0.5 bg-primary/20 text-primary rounded text-xs">

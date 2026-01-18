@@ -1,5 +1,8 @@
-import { mutation, query } from "./_generated/server";
+import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
+import { validatePrimaryLiftForGoal } from "./primaryLifts";
 
 /**
  * Query to get all goals for a user
@@ -25,20 +28,38 @@ export const getActiveGoal = query({
         userId: v.id("users"),
     },
     handler: async (ctx, args) => {
-        return await ctx.db
+        console.log("[getActiveGoal] Called with userId:", args.userId);
+        const goal = await ctx.db
             .query("goals")
             .withIndex("by_user_and_active", (q) => 
                 q.eq("userId", args.userId).eq("isActive", true)
             )
             .first();
+        
+        console.log("[getActiveGoal] Found goal:", goal ? { 
+            _id: goal._id, 
+            category: goal.category, 
+            isActive: goal.isActive 
+        } : "null");
+        
+        // Check if user has any goals at all
+        if (!goal) {
+            const allGoals = await ctx.db
+                .query("goals")
+                .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+                .collect();
+            console.log("[getActiveGoal] User has", allGoals.length, "total goals (none active)");
+        }
+        
+        return goal;
     },
 });
 
 /**
- * Mutation to create a new goal
+ * Internal mutation to create a new goal (called by createGoal action)
  * Sets it as active and deactivates all other goals for the user
  */
-export const createGoal = mutation({
+export const createGoalMutation = mutation({
     args: {
         userId: v.id("users"),
         category: v.union(
@@ -74,6 +95,15 @@ export const createGoal = mutation({
             throw new Error("User not found");
         }
 
+        // Validate strength goals: if exercise is specified, it must be an approved PRIMARY LIFT
+        // If no exercise is specified, it's an "overall strength" goal (valid)
+        if (args.category === "strength" && args.target?.exercise) {
+            const validation = await validatePrimaryLiftForGoal(ctx, args.target.exercise);
+            if (!validation.isValid) {
+                throw new Error(validation.error || "Invalid exercise for strength goal");
+            }
+        }
+
         // Deactivate all existing goals for this user
         const allUserGoals = await ctx.db
             .query("goals")
@@ -96,6 +126,104 @@ export const createGoal = mutation({
             unit: args.unit,
             isActive: true,
         });
+    },
+});
+
+/**
+ * Action to create a new goal and automatically generate today's workout if it's a workout day
+ * Sets it as active and deactivates all other goals for the user
+ */
+export const createGoal = action({
+    args: {
+        userId: v.id("users"),
+        category: v.union(
+            v.literal("body_composition"),
+            v.literal("strength"),
+            v.literal("endurance"),
+            v.literal("mobility"),
+            v.literal("skill")
+        ),
+        target: v.optional(v.object({
+            exercise: v.optional(v.string()),
+            movement: v.optional(v.string()),
+            metric: v.optional(v.union(
+                v.literal("weight"),
+                v.literal("reps"),
+                v.literal("time"),
+                v.literal("distance"),
+                v.literal("rom")
+            )),
+        })),
+        direction: v.optional(v.union(
+            v.literal("increase"),
+            v.literal("decrease"),
+            v.literal("achieve")
+        )),
+        value: v.optional(v.number()),
+        unit: v.optional(v.string()),
+    },
+    handler: async (ctx, args): Promise<Id<"goals">> => {
+        // Create the goal using the internal mutation
+        const goalId: Id<"goals"> = await ctx.runMutation(api.goals.createGoalMutation, args);
+
+        // Try to generate today's workout automatically
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayStr = today.toISOString().split("T")[0];
+
+            // Always regenerate workout for new goal (delete existing if it exists for today)
+            // This ensures the workout matches the new goal
+            const existingSession = await ctx.runQuery(api.plans.getWorkoutByDate, {
+                userId: args.userId,
+                date: todayStr,
+            });
+
+            // Delete any existing workout for today (will be replaced with goal-specific workout)
+            if (existingSession) {
+                console.log(`[createGoal] Deleting existing workout for ${todayStr} to regenerate for new goal`);
+                try {
+                    // Delete all sessions for today (main, stretch, cardio, etc.)
+                    const allTodaySessions = await ctx.runQuery(api.plans.getWorkoutsByDateRange, {
+                        userId: args.userId,
+                        startDate: todayStr,
+                        endDate: todayStr,
+                    });
+                    
+                    for (const session of allTodaySessions) {
+                        await ctx.runMutation(api.plans.deleteWorkoutSession, {
+                            sessionId: session._id,
+                        });
+                    }
+                } catch (error) {
+                    console.error(`[createGoal] Failed to delete existing workout:`, error);
+                }
+            }
+            
+            // Generate new workout linked to this goal
+            try {
+                await ctx.runAction(api.plans.generateDailyWorkoutAndMeals, {
+                    userId: args.userId,
+                    date: todayStr,
+                    goalId: goalId, // Pass the goal ID to link the workout
+                });
+                console.log(`[createGoal] Successfully generated workout for new goal ${goalId} on ${todayStr}`);
+            } catch (error) {
+                // If it's a rest day or other expected error, that's fine - just log it
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                if (errorMessage.includes("rest day") || errorMessage.includes("already exists")) {
+                    console.log(`[createGoal] Expected: ${errorMessage}`);
+                } else {
+                    // Unexpected error - log but don't fail goal creation
+                    console.error(`[createGoal] Error generating workout:`, error);
+                }
+            }
+        } catch (error) {
+            // Don't fail goal creation if workout generation fails
+            console.error(`[createGoal] Error checking/generating workout:`, error);
+        }
+
+        return goalId;
     },
 });
 
@@ -133,6 +261,41 @@ export const setActiveGoal = mutation({
 
         // Activate the selected goal
         await ctx.db.patch(args.goalId, { isActive: true });
+
+        // Regenerate today's workout for the new active goal
+        try {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayStr = today.toISOString().split("T")[0];
+
+            // Delete any existing workouts for today (will be replaced with new goal's workout)
+            const existingSessions = await ctx.runQuery(api.plans.getWorkoutsByDateRange, {
+                userId: args.userId,
+                startDate: todayStr,
+                endDate: todayStr,
+            });
+
+            if (existingSessions && existingSessions.length > 0) {
+                console.log(`[setActiveGoal] Deleting ${existingSessions.length} existing workout(s) to regenerate for new active goal`);
+                for (const session of existingSessions) {
+                    await ctx.runMutation(api.plans.deleteWorkoutSession, {
+                        sessionId: session._id,
+                    });
+                }
+            }
+
+            // Note: Workout generation should be triggered separately via action
+            // Mutations cannot call actions directly
+            console.log(`[setActiveGoal] Goal ${args.goalId} activated. Workout generation should be triggered separately if needed.`);
+        } catch (error) {
+            // Don't fail goal activation if workout generation fails
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.includes("rest day")) {
+                console.log(`[setActiveGoal] Expected: ${errorMessage}`);
+            } else {
+                console.error(`[setActiveGoal] Error generating workout:`, error);
+            }
+        }
 
         return { success: true };
     },
@@ -182,6 +345,21 @@ export const updateGoal = mutation({
             throw new Error("Goal does not belong to user");
         }
 
+        // Determine the category after update (use new category if provided, otherwise existing)
+        const updatedCategory = args.category !== undefined ? args.category : goal.category;
+        
+        // Determine the target after update (use new target if provided, otherwise existing)
+        const updatedTarget = args.target !== undefined ? args.target : goal.target;
+
+        // Validate strength goals: if exercise is specified, it must be an approved PRIMARY LIFT
+        // If no exercise is specified, it's an "overall strength" goal (valid)
+        if (updatedCategory === "strength" && updatedTarget?.exercise) {
+            const validation = await validatePrimaryLiftForGoal(ctx, updatedTarget.exercise);
+            if (!validation.isValid) {
+                throw new Error(validation.error || "Invalid exercise for strength goal");
+            }
+        }
+
         // Build update object with only provided fields
         const updates: Record<string, any> = {};
         if (args.category !== undefined) updates.category = args.category;
@@ -219,6 +397,74 @@ export const deleteGoal = mutation({
         await ctx.db.delete(args.goalId);
 
         return { success: true };
+    },
+});
+
+/**
+ * Mutation to mark a goal as completed
+ * When a goal is completed, it also deletes all uncompleted workouts linked to that goal
+ */
+export const completeGoal = mutation({
+    args: {
+        goalId: v.id("goals"),
+        userId: v.id("users"),
+    },
+    handler: async (ctx, args) => {
+        // Verify the goal exists and belongs to the user
+        const goal = await ctx.db.get(args.goalId);
+        if (!goal) {
+            throw new Error("Goal not found");
+        }
+
+        if (goal.userId !== args.userId) {
+            throw new Error("Goal does not belong to user");
+        }
+
+        // Mark the goal as completed
+        await ctx.db.patch(args.goalId, { completed: true, isActive: false });
+
+        // Find all workout sessions linked to this goal
+        const workoutSessions = await ctx.db
+            .query("workout_sessions")
+            .withIndex("by_goal_id", (q) => q.eq("goalId", args.goalId))
+            .collect();
+
+        // Delete all uncompleted workouts for this goal
+        let deletedCount = 0;
+        for (const session of workoutSessions) {
+            // Check if the workout is completed by checking if all exercise sets are completed
+            const sets = await ctx.db
+                .query("exercise_sets")
+                .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
+                .collect();
+
+            const allSetsCompleted = sets.length > 0 && sets.every((set) => set.completed);
+
+            // If workout is not completed, delete it
+            if (!allSetsCompleted) {
+                // Delete exercise sets
+                for (const set of sets) {
+                    await ctx.db.delete(set._id);
+                }
+
+                // Delete daily meals
+                const meals = await ctx.db
+                    .query("daily_meals")
+                    .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
+                    .collect();
+                for (const meal of meals) {
+                    await ctx.db.delete(meal._id);
+                }
+
+                // Delete the session
+                await ctx.db.delete(session._id);
+                deletedCount++;
+            }
+        }
+
+        console.log(`[completeGoal] Marked goal ${args.goalId} as completed and deleted ${deletedCount} uncompleted workout(s)`);
+
+        return { success: true, deletedWorkouts: deletedCount };
     },
 });
 

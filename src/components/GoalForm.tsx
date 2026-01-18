@@ -24,9 +24,10 @@ type GoalFormProps = {
     goal?: Goal;
     onSave: (goal: Goal) => void;
     onCancel: () => void;
+    isLoading?: boolean;
 };
 
-export const GoalForm = ({ goal, onSave, onCancel }: GoalFormProps) => {
+export const GoalForm = ({ goal, onSave, onCancel, isLoading }: GoalFormProps) => {
     const [formData, setFormData] = useState<Partial<Goal>>({
         category: goal?.category || "body_composition",
         target: goal?.target || {},
@@ -472,10 +473,10 @@ export const GoalForm = ({ goal, onSave, onCancel }: GoalFormProps) => {
 
                     {/* Submit Buttons */}
                     <div className="flex gap-2 pt-4">
-                        <Button type="submit" className="flex-1">
-                            {goal ? "Update Goal" : "Add Goal"}
+                        <Button type="submit" className="flex-1" disabled={isLoading}>
+                            {isLoading ? "Saving..." : goal ? "Update Goal" : "Add Goal"}
                         </Button>
-                        <Button type="button" variant="outline" onClick={onCancel}>
+                        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
                             Cancel
                         </Button>
                     </div>

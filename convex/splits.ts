@@ -5,7 +5,7 @@
  * Each split specifies which body parts are trained on which days.
  */
 
-export type SplitType = "PPL" | "UPPER_LOWER" | "FULL_BODY" | "BRO_SPLIT" | "PUSH_PULL_LEGS_ARMS";
+export type SplitType = "PPL" | "UPPER_LOWER" | "FULL_BODY" | "BRO_SPLIT" | "PUSH_PULL_LEGS_ARMS" | "CHEST_BACK_SHOULDERS_ARMS_LEGS";
 
 export type SplitDay = {
     day: number; // Day number in the split cycle (1-indexed)
@@ -128,6 +128,28 @@ export const SPLIT_TEMPLATES: Record<SplitType, SplitTemplate> = {
                 day: 4,
                 name: "Arms",
                 bodyParts: ["biceps", "triceps"],
+            },
+        ],
+    },
+    CHEST_BACK_SHOULDERS_ARMS_LEGS: {
+        type: "CHEST_BACK_SHOULDERS_ARMS_LEGS",
+        name: "Chest & Back / Shoulders & Arms / Legs",
+        daysPerWeek: 3, // 3 days per week
+        days: [
+            {
+                day: 1,
+                name: "Chest & Back",
+                bodyParts: ["chest", "upper back", "lats"],
+            },
+            {
+                day: 2,
+                name: "Shoulders & Arms",
+                bodyParts: ["front delts", "lateral delts", "rear delts", "biceps", "triceps"],
+            },
+            {
+                day: 3,
+                name: "Legs",
+                bodyParts: ["quads", "hamstrings", "glutes"],
             },
         ],
     },

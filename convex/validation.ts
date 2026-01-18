@@ -30,8 +30,9 @@ export function validateWorkoutBlueprint(
     const warnings: string[] = [];
 
     // Check exercise count
-    const expectedCompoundCount = workoutIntent.intensity === "heavy" ? 2 : 3;
-    const expectedAccessoryCount = workoutIntent.intensity === "heavy" ? 2 : 3;
+    // Strengthen intensity uses fewer exercises (more focus), maintain/recover use more variety
+    const expectedCompoundCount = workoutIntent.intensity === "strengthen" ? 2 : 3;
+    const expectedAccessoryCount = workoutIntent.intensity === "strengthen" ? 2 : 3;
     const expectedTotal = expectedCompoundCount + expectedAccessoryCount;
 
     if (blueprint.exercises.length !== expectedTotal) {

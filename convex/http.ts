@@ -308,7 +308,7 @@ Do not include any text outside the JSON.`;
                 ? (fitness_goal.toLowerCase().includes("lose") || fitness_goal.toLowerCase().includes("fat") ? "decrease" : "increase")
                 : "increase";
 
-            await ctx.runMutation(api.goals.createGoal, {
+            await ctx.runAction(api.goals.createGoal, {
                 userId: user_id,
                 category: goalCategory,
                 direction: goalDirection,

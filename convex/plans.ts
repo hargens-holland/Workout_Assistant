@@ -14,8 +14,10 @@ import {
     type RecentWorkout,
     type ActiveGoal,
 } from "./constraints";
+import { shouldWorkoutToday, getWorkoutSchedule } from "./workouts/workoutUtils";
 import {
     generateDailyWorkout,
+    generateWorkoutFromTemplate,
     generateDailyMeals,
     generateWorkoutExplanation,
     generateMealExplanation,
@@ -29,6 +31,8 @@ import {
 } from "./validation";
 import { getExerciseContext } from "../src/ai/retrieval/getExerciseContext";
 import { getMealContext } from "../src/ai/retrieval/getMealContext";
+import { getSplitDayName } from "./split_templates";
+import { determineSplitDay } from "./workouts/workoutUtils";
 
 /* =======================
    Convex Queries & Mutations
@@ -361,9 +365,12 @@ type WeeklySession = {
 type Exercise = {
     _id: Id<"exercises">;
     name: string;
-    bodyPart: string;
+    bodyPart?: string; // Kept for backward compatibility
+    bodyParts: string[]; // Array of body parts this exercise targets
     isCompound: boolean;
     equipment?: string;
+    instructions?: string[];
+    tutorialImage?: string;
 };
 
 /**
@@ -719,12 +726,29 @@ export const selectRandomExercisesForCategory = query({
 
         // Collect all matching exercises
         const candidateExercises: Exercise[] = [];
+        const bodyPartLower = args.bodyParts.map(bp => bp.toLowerCase());
 
         for (const bodyPart of args.bodyParts) {
+            const bodyPartLowercase = bodyPart.toLowerCase();
+
+            // Query by bodyPart index (for backward compatibility)
             let exercises = await ctx.db
                 .query("exercises")
-                .withIndex("by_body_part", (q) => q.eq("bodyPart", bodyPart.toLowerCase()))
+                .withIndex("by_body_part", (q) => q.eq("bodyPart", bodyPartLowercase))
                 .collect();
+
+            // Also get all exercises and filter by bodyParts array
+            const allExercises = await ctx.db.query("exercises").collect();
+            const exercisesByBodyParts = allExercises.filter(
+                (e) => e.bodyParts && e.bodyParts.some(bp => bp.toLowerCase() === bodyPartLowercase)
+            );
+
+            // Combine and deduplicate
+            const exerciseMap = new Map<string, typeof exercises[0]>();
+            for (const ex of [...exercises, ...exercisesByBodyParts]) {
+                exerciseMap.set(ex._id, ex);
+            }
+            exercises = Array.from(exerciseMap.values());
 
             // Filter by compound if specified
             if (args.isCompound !== undefined) {
@@ -733,11 +757,7 @@ export const selectRandomExercisesForCategory = query({
 
             // Prefer compound exercises if isCompound is true but we need more
             if (args.isCompound === true && exercises.length < args.count) {
-                const allExercises = await ctx.db
-                    .query("exercises")
-                    .withIndex("by_body_part", (q) => q.eq("bodyPart", bodyPart.toLowerCase()))
-                    .collect();
-                exercises = allExercises;
+                // Already have all exercises, no need to query again
             }
 
             candidateExercises.push(...exercises);
@@ -918,30 +938,50 @@ export const calculateProgressionForExercise = query({
 export const createWorkoutSession = mutation({
     args: {
         userId: v.id("users"),
+        goalId: v.optional(v.id("goals")), // Link workout to specific goal (required for new workouts)
         date: v.string(),
         dayOfWeek: v.optional(v.string()),
         intensity: v.string(),
+        workoutType: v.union(
+            v.literal("main"),
+            v.literal("stretch"),
+            v.literal("cardio"),
+            v.literal("endurance")
+        ),
         workoutExplanation: v.optional(v.string()),
         mealExplanation: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // Check for duplicate workout session (same user, same date)
-        const existingSession = await ctx.db
+        // Check for duplicate workout session (same user, same date, same type, same goal)
+        // Allow multiple sessions per day if they have different types or goals
+        const existingSessions = await ctx.db
             .query("workout_sessions")
             .withIndex("by_user_and_date", (q) =>
-                q.eq("userId", args.userId).eq("date", args.date)
+                q.eq("userId", args.userId)
+                    .eq("date", args.date)
             )
-            .first();
+            .collect();
+
+        const existingSession = existingSessions.find(
+            (s) => s.workoutType === args.workoutType &&
+                (args.goalId ? s.goalId === args.goalId : !s.goalId) // Match goalId if provided, or match sessions without goalId
+        );
 
         if (existingSession) {
-            throw new Error(`A workout session already exists for date ${args.date}`);
+            throw new Error(`A ${args.workoutType} workout session already exists for date ${args.date}${args.goalId ? ` and goal ${args.goalId}` : ""}`);
+        }
+
+        if (!args.goalId) {
+            throw new Error("goalId is required for new workout sessions");
         }
 
         return await ctx.db.insert("workout_sessions", {
             userId: args.userId,
+            goalId: args.goalId,
             date: args.date,
             dayOfWeek: args.dayOfWeek,
             intensity: args.intensity,
+            workoutType: args.workoutType,
             workoutExplanation: args.workoutExplanation,
             mealExplanation: args.mealExplanation,
         });
@@ -974,6 +1014,12 @@ export const getWorkoutsByDateRange = query({
         endDate: v.string(),
     },
     handler: async (ctx, args) => {
+        console.log("[getWorkoutsByDateRange] Called with:", {
+            userId: args.userId,
+            startDate: args.startDate,
+            endDate: args.endDate
+        });
+
         // Get today's date to prevent future queries
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -988,10 +1034,44 @@ export const getWorkoutsByDateRange = query({
             .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
             .collect();
 
+        console.log("[getWorkoutsByDateRange] Found", allSessions.length, "total sessions for user");
+
         // Filter sessions by date range (only past and today)
-        const sessions = allSessions.filter(
+        let sessions = allSessions.filter(
             (s) => s.date >= args.startDate && s.date <= effectiveEndDate
         );
+
+        // For today's date, only show workouts for active goal
+        // For past dates, show all workouts (history)
+        if (args.startDate <= todayStr && effectiveEndDate >= todayStr) {
+            const activeGoal = await ctx.db
+                .query("goals")
+                .withIndex("by_user_and_active", (q) =>
+                    q.eq("userId", args.userId).eq("isActive", true)
+                )
+                .first();
+
+            if (activeGoal) {
+                // Filter today's sessions to only show active goal's workouts
+                sessions = sessions.filter(s => {
+                    if (s.date === todayStr) {
+                        return s.goalId === activeGoal._id;
+                    }
+                    return true; // Keep all past workouts
+                });
+                console.log("[getWorkoutsByDateRange] Filtered today's sessions to active goal:", activeGoal._id);
+            }
+        }
+
+        console.log("[getWorkoutsByDateRange] Filtered to", sessions.length, "sessions in date range");
+        if (sessions.length > 0) {
+            console.log("[getWorkoutsByDateRange] Session dates:", sessions.map(s => ({
+                date: s.date,
+                workoutType: s.workoutType,
+                goalId: s.goalId,
+                hasExercises: "checking..."
+            })));
+        }
 
         const workouts = await Promise.all(
             sessions.map(async (session) => {
@@ -1048,14 +1128,52 @@ export const getWorkoutByDate = query({
         date: v.string(),
     },
     handler: async (ctx, args) => {
-        const session = await ctx.db
+        console.log("[getWorkoutByDate] Called with:", { userId: args.userId, date: args.date });
+
+        // Get active goal first
+        const activeGoal = await ctx.db
+            .query("goals")
+            .withIndex("by_user_and_active", (q) =>
+                q.eq("userId", args.userId).eq("isActive", true)
+            )
+            .first();
+
+        if (!activeGoal) {
+            console.log("[getWorkoutByDate] No active goal, returning null");
+            return null;
+        }
+
+        // Get sessions for this date and filter by active goal
+        const sessions = await ctx.db
             .query("workout_sessions")
             .withIndex("by_user_and_date", (q) =>
                 q.eq("userId", args.userId).eq("date", args.date)
             )
-            .first();
+            .collect();
+
+        // Get main workout session for active goal
+        // If no session found for active goal, return null (don't show old workouts without goalId)
+        const session = sessions.find(s => s.goalId === activeGoal._id && s.workoutType === "main") ||
+            sessions.find(s => s.goalId === activeGoal._id) ||
+            null;
+
+        console.log("[getWorkoutByDate] Session found:", session ? {
+            _id: session._id,
+            date: session.date,
+            workoutType: session.workoutType
+        } : "null");
 
         if (!session) {
+            // Check all sessions for this user to see what dates exist
+            const allUserSessions = await ctx.db
+                .query("workout_sessions")
+                .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+                .collect();
+            console.log("[getWorkoutByDate] User has", allUserSessions.length, "total sessions");
+            if (allUserSessions.length > 0) {
+                const dates = allUserSessions.map(s => s.date).slice(0, 5);
+                console.log("[getWorkoutByDate] Sample session dates:", dates);
+            }
             return null;
         }
 
@@ -1065,9 +1183,14 @@ export const getWorkoutByDate = query({
             .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
             .collect();
 
+        console.log("[getWorkoutByDate] Found", sets.length, "sets for session");
+
         const exercises = await Promise.all(
             sets.map(async (set) => {
                 const exercise = await ctx.db.get(set.exerciseId);
+                if (!exercise) {
+                    console.warn("[getWorkoutByDate] Exercise not found for set:", set.exerciseId);
+                }
                 return {
                     ...set,
                     exercise,
@@ -1270,18 +1393,27 @@ export const getAllWorkoutSessions = query({
 export const createExercise = mutation({
     args: {
         name: v.string(),
-        bodyPart: v.string(),
+        bodyPart: v.optional(v.string()), // Kept for backward compatibility
+        bodyParts: v.array(v.string()), // Array of body parts this exercise targets
         isCompound: v.boolean(),
         equipment: v.optional(v.string()),
         instructions: v.optional(v.array(v.string())),
+        tutorialImage: v.optional(v.string()), // URL or path to tutorial image/video
     },
     handler: async (ctx, args) => {
+        // Normalize body parts to lowercase
+        const bodyParts = args.bodyParts.map(bp => bp.toLowerCase());
+        // Set bodyPart to first body part for backward compatibility with index
+        const bodyPart = bodyParts.length > 0 ? bodyParts[0] : args.bodyPart?.toLowerCase();
+
         return await ctx.db.insert("exercises", {
             name: args.name,
-            bodyPart: args.bodyPart.toLowerCase(),
+            bodyPart: bodyPart,
+            bodyParts: bodyParts,
             isCompound: args.isCompound,
             equipment: args.equipment,
             instructions: args.instructions,
+            tutorialImage: args.tutorialImage,
         });
     },
 });
@@ -1294,10 +1426,12 @@ export const importExercises = action({
         exercises: v.array(
             v.object({
                 name: v.string(),
-                bodyPart: v.string(),
+                bodyPart: v.optional(v.string()), // Kept for backward compatibility
+                bodyParts: v.array(v.string()), // Array of body parts
                 isCompound: v.boolean(),
                 equipment: v.optional(v.string()),
                 instructions: v.optional(v.array(v.string())),
+                tutorialImage: v.optional(v.string()),
             })
         ),
     },
@@ -1326,12 +1460,29 @@ export const importExercises = action({
                     continue;
                 }
 
+                // Derive bodyPart from bodyParts if not provided (for backward compatibility)
+                // bodyParts is required and should have at least one element
+                // Use the first body part as the primary bodyPart for indexing
+                if (!exercise.bodyParts || exercise.bodyParts.length === 0) {
+                    errors.push({
+                        exercise: exercise.name,
+                        error: "bodyParts array is required and must have at least one element",
+                    });
+                    continue;
+                }
+
+                // Ensure bodyPart is always a string (never undefined)
+                // This is required for backward compatibility with the database index
+                const bodyPart: string = exercise.bodyPart || exercise.bodyParts[0];
+
                 const id = await ctx.runMutation(api.plans.createExercise, {
                     name: exercise.name,
-                    bodyPart: exercise.bodyPart,
+                    bodyPart: bodyPart, // Always a string, never undefined
+                    bodyParts: exercise.bodyParts,
                     isCompound: exercise.isCompound,
                     equipment: exercise.equipment,
                     instructions: exercise.instructions,
+                    tutorialImage: exercise.tutorialImage,
                 });
 
                 results.push({ id, name: exercise.name });
@@ -1398,7 +1549,7 @@ export const getExerciseContextForRAG = query({
         if (args.bodyPart) {
             const bodyPartLower = args.bodyPart.toLowerCase();
             exercises = exercises.filter(
-                (e) => e.bodyPart.toLowerCase() === bodyPartLower
+                (e) => e.bodyPart && e.bodyPart.toLowerCase() === bodyPartLower
             );
         }
 
@@ -1473,12 +1624,14 @@ export const getExerciseStats = query({
         const stats: Record<string, { total: number; compound: number }> = {};
 
         for (const exercise of allExercises) {
-            if (!stats[exercise.bodyPart]) {
-                stats[exercise.bodyPart] = { total: 0, compound: 0 };
+            const bodyPart = exercise.bodyPart;
+            if (!bodyPart) continue;
+            if (!stats[bodyPart]) {
+                stats[bodyPart] = { total: 0, compound: 0 };
             }
-            stats[exercise.bodyPart].total++;
+            stats[bodyPart].total++;
             if (exercise.isCompound) {
-                stats[exercise.bodyPart].compound++;
+                stats[bodyPart].compound++;
             }
         }
 
@@ -1790,6 +1943,35 @@ export const getSplitTypes = query({
             FULL_BODY: { name: "Full Body", daysPerWeek: 3 },
             BRO_SPLIT: { name: "Bro Split", daysPerWeek: 5 },
             PUSH_PULL_LEGS_ARMS: { name: "Push/Pull/Legs/Arms", daysPerWeek: 4 },
+            CHEST_BACK_SHOULDERS_ARMS_LEGS: { name: "Chest & Back / Shoulders & Arms / Legs", daysPerWeek: 3 },
+        };
+    },
+});
+
+/**
+ * Query to get user's workout schedule (custom days or calculated)
+ */
+export const getUserWorkoutSchedule = query({
+    args: {
+        userId: v.id("users"),
+    },
+    handler: async (ctx, args) => {
+        const user = await ctx.db.get(args.userId);
+        if (!user) {
+            throw new Error("User not found");
+        }
+
+        const workoutsPerWeek = user.preferences?.workout_days_per_week as number | undefined;
+        const customWorkoutDays = user.preferences?.custom_workout_days as number[] | undefined;
+
+        const schedule = getWorkoutSchedule(workoutsPerWeek, customWorkoutDays);
+
+        return {
+            schedule,
+            isCustom: !!(customWorkoutDays && customWorkoutDays.length > 0),
+            workoutsPerWeek: customWorkoutDays && customWorkoutDays.length > 0
+                ? customWorkoutDays.length
+                : workoutsPerWeek,
         };
     },
 });
@@ -1971,7 +2153,7 @@ export const regenerateExercise = action({
             const sets = await ctx.runQuery(api.plans.getExerciseSetsBySession, {
                 sessionId: ws._id,
             });
-            sets.forEach((s) => exercisesUsedThisWeek.add(s.exerciseId));
+            sets.forEach((s: { exerciseId: Id<"exercises"> }) => exercisesUsedThisWeek.add(s.exerciseId));
         }
 
         // Get new exercise with same body part
@@ -1988,7 +2170,9 @@ export const regenerateExercise = action({
             }
 
             // Validate that preferred exercise matches body part
-            if (preferredExercise.bodyPart.toLowerCase() !== oldExercise.bodyPart.toLowerCase()) {
+            const preferredBodyPart = preferredExercise.bodyPart || preferredExercise.bodyParts?.[0];
+            const oldBodyPart = oldExercise.bodyPart || oldExercise.bodyParts?.[0];
+            if (!preferredBodyPart || !oldBodyPart || preferredBodyPart.toLowerCase() !== oldBodyPart.toLowerCase()) {
                 throw new Error("Preferred exercise does not match body part");
             }
 
@@ -2000,8 +2184,14 @@ export const regenerateExercise = action({
             newExerciseId = args.preferredExerciseId;
         } else {
             // Default behavior: select random exercise
+            const oldBodyParts = oldExercise.bodyParts && oldExercise.bodyParts.length > 0
+                ? oldExercise.bodyParts
+                : (oldExercise.bodyPart ? [oldExercise.bodyPart] : []);
+            if (oldBodyParts.length === 0) {
+                throw new Error("Exercise has no body part information");
+            }
             const newExerciseIds = await ctx.runQuery(api.plans.selectRandomExercisesForCategory, {
-                bodyParts: [oldExercise.bodyPart],
+                bodyParts: oldBodyParts,
                 isCompound: session.intensity === "heavy" ? true : undefined,
                 count: 1,
                 excludeExerciseIds: Array.from(exercisesUsedThisWeek),
@@ -2218,7 +2408,7 @@ export const getOrCreateRunningExercise = action({
         // If not found, create it
         const exerciseId = await ctx.runMutation(api.plans.createExercise, {
             name: "Running",
-            bodyPart: "cardio",
+            bodyParts: ["cardio"],
             isCompound: false,
             equipment: "none",
             instructions: ["Run at a steady pace", "Maintain proper running form", "Focus on breathing rhythm"],
@@ -2249,7 +2439,7 @@ export const deleteExerciseSet = mutation({
 export const updatePlanSplitType = mutation({
     args: {
         planId: v.id("plans"),
-        splitType: v.union(v.literal("PPL"), v.literal("UPPER_LOWER"), v.literal("FULL_BODY"), v.literal("BRO_SPLIT"), v.literal("PUSH_PULL_LEGS_ARMS")),
+        splitType: v.union(v.literal("PPL"), v.literal("UPPER_LOWER"), v.literal("FULL_BODY"), v.literal("BRO_SPLIT"), v.literal("PUSH_PULL_LEGS_ARMS"), v.literal("CHEST_BACK_SHOULDERS_ARMS_LEGS")),
     },
     handler: async (ctx, args) => {
         const plan = await ctx.db.get(args.planId);
@@ -2616,7 +2806,10 @@ export const getBodyPartStrength = query({
                 const exercise = await ctx.db.get(set.exerciseId);
                 if (!exercise) continue;
 
-                const bodyPart = exercise.bodyPart;
+                // Use bodyPart if available, otherwise use first bodyParts element
+                const bodyPart = exercise.bodyPart || (exercise.bodyParts && exercise.bodyParts.length > 0 ? exercise.bodyParts[0] : null);
+                if (!bodyPart) continue; // Skip if no body part available
+
                 if (!bodyPartMap.has(bodyPart)) {
                     bodyPartMap.set(bodyPart, {
                         totalVolume: 0,
@@ -2701,7 +2894,10 @@ export const getBodyPartWorkoutHistory = query({
                 const exercise = await ctx.db.get(set.exerciseId);
                 if (!exercise) continue;
 
-                const bodyPart = exercise.bodyPart.toLowerCase();
+                // Use bodyPart if available, otherwise use first bodyParts element
+                const bodyPartValue = exercise.bodyPart || (exercise.bodyParts && exercise.bodyParts.length > 0 ? exercise.bodyParts[0] : null);
+                if (!bodyPartValue) continue; // Skip if no body part available
+                const bodyPart = bodyPartValue.toLowerCase();
                 const exerciseName = exercise.name;
                 const weight = set.actualWeight || set.plannedWeight;
                 const reps = set.actualReps || set.plannedReps;
@@ -2759,10 +2955,27 @@ export const getExercisesByBodyPart = query({
         bodyPart: v.string(),
     },
     handler: async (ctx, args) => {
-        return await ctx.db
+        const bodyPartLower = args.bodyPart.toLowerCase();
+
+        // Query by bodyPart index (for backward compatibility)
+        const exercisesByIndex = await ctx.db
             .query("exercises")
-            .withIndex("by_body_part", (q) => q.eq("bodyPart", args.bodyPart.toLowerCase()))
+            .withIndex("by_body_part", (q) => q.eq("bodyPart", bodyPartLower))
             .collect();
+
+        // Also get exercises where bodyParts array includes this body part
+        const allExercises = await ctx.db.query("exercises").collect();
+        const exercisesByBodyParts = allExercises.filter(
+            (e) => e.bodyParts && e.bodyParts.some(bp => bp.toLowerCase() === bodyPartLower)
+        );
+
+        // Combine and deduplicate
+        const exerciseMap = new Map<string, typeof exercisesByIndex[0]>();
+        for (const ex of [...exercisesByIndex, ...exercisesByBodyParts]) {
+            exerciseMap.set(ex._id, ex);
+        }
+
+        return Array.from(exerciseMap.values());
     },
 });
 
@@ -2787,11 +3000,22 @@ export const logBodyTrackerWorkout = mutation({
 
         let sessionId: Id<"workout_sessions">;
         if (!session) {
+            // Get active goal for this user
+            const activeGoal = await ctx.runQuery(api.goals.getActiveGoal, {
+                userId: args.userId,
+            });
+
+            if (!activeGoal) {
+                throw new Error("No active goal found. Please create a goal first.");
+            }
+
             // Create a new workout session
             sessionId = await ctx.db.insert("workout_sessions", {
                 userId: args.userId,
+                goalId: activeGoal._id,
                 date: args.date,
                 intensity: "moderate",
+                workoutType: "main", // Default to main workout type
                 dayOfWeek: new Date(args.date).toLocaleDateString("en-US", { weekday: "long" }),
             });
         } else {
@@ -2940,6 +3164,7 @@ export const generateDailyWorkoutAndMeals = action({
     args: {
         userId: v.id("users"),
         date: v.string(), // ISO date string (YYYY-MM-DD) - must be today
+        goalId: v.optional(v.id("goals")), // Optional: if not provided, uses active goal
     },
     handler: async (ctx, args): Promise<{
         success: boolean;
@@ -2947,32 +3172,83 @@ export const generateDailyWorkoutAndMeals = action({
         workoutIntent: WorkoutIntent;
         nutritionIntent: NutritionIntent;
     }> => {
+        console.log("[generateDailyWorkoutAndMeals] Starting generation for:", { userId: args.userId, date: args.date, goalId: args.goalId });
+
         // Validate that date is today
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayStr = today.toISOString().split("T")[0];
 
         if (args.date !== todayStr) {
+            console.error("[generateDailyWorkoutAndMeals] Date mismatch:", { requested: args.date, today: todayStr });
             throw new Error(`Can only generate workouts for today (${todayStr}). Received: ${args.date}`);
         }
 
-        // Check if workout already exists for today
-        const existingSession = await ctx.runQuery(api.plans.getWorkoutByDate, {
-            userId: args.userId,
-            date: args.date,
-        });
+        // Get goal (use provided goalId or active goal)
+        let goalId: Id<"goals">;
+        let activeGoal: ActiveGoal | null;
 
-        if (existingSession) {
-            throw new Error(`A workout already exists for today (${args.date})`);
+        if (args.goalId) {
+            // Use provided goal ID
+            const goal = await ctx.runQuery(api.goals.getUserGoals, { userId: args.userId });
+            const goalDoc = goal?.find((g: any) => g._id === args.goalId);
+            if (!goalDoc) {
+                throw new Error("Goal not found");
+            }
+            goalId = args.goalId;
+            activeGoal = {
+                category: goalDoc.category,
+                target: goalDoc.target,
+                direction: goalDoc.direction,
+                value: goalDoc.value,
+                unit: goalDoc.unit,
+                priority: "medium" as const,
+            };
+        } else {
+            // Use active goal
+            const goal = await ctx.runQuery(api.goals.getActiveGoal, {
+                userId: args.userId,
+            });
+
+            if (!goal) {
+                console.error("[generateDailyWorkoutAndMeals] No active goal found");
+                throw new Error("No active goal found. Please create a goal first.");
+            }
+
+            goalId = goal._id;
+            activeGoal = {
+                category: goal.category,
+                target: goal.target,
+                direction: goal.direction,
+                value: goal.value,
+                unit: goal.unit,
+                priority: "medium" as const,
+            };
         }
 
-        // Get active goal (required)
-        const activeGoal = await ctx.runQuery(api.goals.getActiveGoal, {
-            userId: args.userId,
-        }) as ActiveGoal | null;
+        console.log("[generateDailyWorkoutAndMeals] Using goal:", {
+            goalId,
+            category: activeGoal.category
+        });
 
-        if (!activeGoal) {
-            throw new Error("No active goal found. Please create a goal first.");
+        // Check if workout already exists for today with this goal
+        const existingSessions = await ctx.runQuery(api.plans.getWorkoutsByDateRange, {
+            userId: args.userId,
+            startDate: todayStr,
+            endDate: todayStr,
+        });
+
+        // Delete any existing workouts for this goal and date
+        if (existingSessions && existingSessions.length > 0) {
+            const goalSessions = existingSessions.filter((s: any) => s.goalId === goalId);
+            if (goalSessions.length > 0) {
+                console.log(`[generateDailyWorkoutAndMeals] Deleting ${goalSessions.length} existing workout(s) for this goal`);
+                for (const session of goalSessions) {
+                    await ctx.runMutation(api.plans.deleteWorkoutSession, {
+                        sessionId: session._id,
+                    });
+                }
+            }
         }
 
         // Get user profile
@@ -2996,20 +3272,72 @@ export const generateDailyWorkoutAndMeals = action({
             endDate: endDateStr,
         });
 
+        // Get user's preferred split, workouts per week, and custom workout days
+        const splitType = userDoc.preferences?.preferred_split as SplitType | undefined;
+        const workoutsPerWeek = userDoc.preferences?.workout_days_per_week as number | undefined;
+        const customWorkoutDays = userDoc.preferences?.custom_workout_days as number[] | undefined;
+
+        // Check if today should be a workout day based on workouts per week or custom days
+        const isWorkoutDay = shouldWorkoutToday(args.date, workoutsPerWeek, recentWorkouts, customWorkoutDays);
+
+        if (!isWorkoutDay) {
+            // Today is a rest day - don't generate a workout
+            const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+            const today = new Date(args.date);
+            const todayName = dayNames[today.getDay()];
+
+            let scheduleInfo = "";
+            if (customWorkoutDays && customWorkoutDays.length > 0) {
+                const scheduleDays = customWorkoutDays.map(day => dayNames[day]).join(", ");
+                scheduleInfo = `Your custom workout days are: ${scheduleDays}.`;
+            } else if (workoutsPerWeek) {
+                scheduleInfo = `Your schedule is ${workoutsPerWeek} workouts per week.`;
+            }
+
+            throw new Error(
+                `Today (${todayName}) is a rest day. ${scheduleInfo} ` +
+                `Take time to recover and come back on your next scheduled workout day!`
+            );
+        }
+
+        // Calculate yesterday's date to check for missed workouts
+        // Reuse the yesterday variable already calculated above
+        const yesterdayDate = yesterday.toISOString().split("T")[0];
+
+        // Get user injury constraints
+        const injuryConstraints = userDoc.injury_constraints;
+
+        // Extract weight loss per week for body composition goals
+        // This can come from goal metadata or be calculated from goal value
+        let weightLossPerWeek: number | undefined;
+        if (activeGoal?.category === "body_composition" && activeGoal.direction === "decrease") {
+            // For now, we'll calculate from goal value if available
+            // In the future, this could be stored in goal metadata or user preferences
+            // Default to 1-1.5 lbs/week if not specified
+            // This could be enhanced to store in goal or user preferences
+            weightLossPerWeek = 1.5; // Default moderate weight loss rate
+        }
+
         // Compute workout intent (pure code, no AI)
+        // Pass yesterdayDate so it can detect missed days and repeat workouts
+        // Pass injuryConstraints to automatically use recover intensity for injured body parts
         const workoutIntent = computeWorkoutIntent({
             activeGoal,
             recentWorkouts,
+            splitType,
+            yesterdayDate,
+            injuryConstraints,
+            weightLossPerWeek,
         });
 
         // Compute progression targets (pure code, no AI)
-        const progressionTargets = computeProgressionTargets(recentWorkouts);
+        const progressionTargets = computeProgressionTargets(recentWorkouts, activeGoal);
 
-        // Get exercise context - need to get all exercises since we can't pass ctx to getExerciseContext
-        // We'll filter by body parts in the AI generation instead
-        const exerciseContext = await ctx.runQuery(api.plans.getExerciseContextForGeneration, {
-            bodyPart: workoutIntent.bodyParts[0], // Use first body part as filter
-        }) as Array<{ _id: Id<"exercises">; name: string; bodyPart: string; isCompound: boolean; equipment?: string }>;
+        // Determine split day number and name for template-based generation
+        const splitDayNumber = determineSplitDay(splitType, recentWorkouts, yesterdayDate);
+        const splitDayName = splitDayNumber && splitType
+            ? getSplitDayName(splitType, splitDayNumber)
+            : null;
 
         // Get blocked exercises
         const allBlockedItems = await ctx.runQuery(api.plans.getBlockedItems, {
@@ -3020,50 +3348,69 @@ export const generateDailyWorkoutAndMeals = action({
             .filter((item: { itemType: string }) => item.itemType === "exercise")
             .map((be: { itemId: string }) => be.itemId);
 
-        // Generate workout using constrained AI
+        // Generate workout using template-based generation (replaces AI)
         let workoutBlueprint: WorkoutBlueprint | undefined;
-        let validationAttempts = 0;
-        const maxAttempts = 3;
 
-        while (validationAttempts < maxAttempts) {
+        if (splitDayName) {
+            // Use template-based generation
             try {
+                workoutBlueprint = await generateWorkoutFromTemplate({
+                    workoutIntent,
+                    progressionTargets,
+                    splitDayName,
+                    userId: args.userId,
+                    ctx,
+                    recentWorkouts,
+                    blockedExerciseIds,
+                });
+            } catch (error) {
+                console.error("Template-based generation failed, falling back to AI:", error);
+                // Fall back to AI generation if template fails
+                const exerciseContext = await ctx.runQuery(api.plans.getExerciseContextForGeneration, {
+                    bodyPart: workoutIntent.bodyParts[0],
+                }) as Array<{ _id: Id<"exercises">; name: string; bodyPart: string; isCompound: boolean; equipment?: string }>;
+
                 workoutBlueprint = await generateDailyWorkout({
                     workoutIntent,
                     progressionTargets,
                     exerciseContext,
                     blockedExerciseIds,
                 });
-
-                // Validate workout
-                const validation = validateWorkoutBlueprint(
-                    workoutBlueprint,
-                    workoutIntent,
-                    progressionTargets,
-                    exerciseContext.map((ex) => ex.name)
-                );
-
-                if (validation.valid) {
-                    break; // Valid workout generated
-                } else {
-                    console.warn(`Workout validation failed (attempt ${validationAttempts + 1}):`, validation.errors);
-                    validationAttempts++;
-                    if (validationAttempts >= maxAttempts) {
-                        throw new Error(`Failed to generate valid workout after ${maxAttempts} attempts: ${validation.errors.join(", ")}`);
-                    }
-                }
-            } catch (error) {
-                validationAttempts++;
-                if (validationAttempts >= maxAttempts) {
-                    throw error;
-                }
             }
+        } else {
+            // No split day name (no split preference or can't determine), fall back to AI
+            const exerciseContext = await ctx.runQuery(api.plans.getExerciseContextForGeneration, {
+                bodyPart: workoutIntent.bodyParts[0],
+            }) as Array<{ _id: Id<"exercises">; name: string; bodyPart: string; isCompound: boolean; equipment?: string }>;
+
+            workoutBlueprint = await generateDailyWorkout({
+                workoutIntent,
+                progressionTargets,
+                exerciseContext,
+                blockedExerciseIds,
+            });
         }
 
         if (!workoutBlueprint) {
             throw new Error("Failed to generate workout blueprint");
         }
 
+        // Validate workout (still use validation for template-based workouts)
+        const exerciseContext = await ctx.runQuery(api.plans.getExerciseContextForGeneration, {});
+        const validation = validateWorkoutBlueprint(
+            workoutBlueprint,
+            workoutIntent,
+            progressionTargets,
+            exerciseContext.map((ex: { name: string }) => ex.name)
+        );
+
+        if (!validation.valid) {
+            console.warn("Workout validation warnings:", validation.errors);
+            // Don't throw - template-based generation should be valid, but log warnings
+        }
+
         // Compute nutrition intent (pure code, no AI)
+        // Pass weightLossPerWeek to factor into calorie calculation
         const nutritionIntent = computeNutritionIntent({
             activeGoal,
             userProfile: {
@@ -3071,6 +3418,7 @@ export const generateDailyWorkoutAndMeals = action({
                 height_cm: userDoc.height_cm,
                 experience_level: userDoc.experience_level,
             },
+            weightLossPerWeek,
         });
 
         // Get meal context
@@ -3123,50 +3471,203 @@ export const generateDailyWorkoutAndMeals = action({
             throw new Error("Failed to generate meal plan");
         }
 
-        // Generate explanations for workout and meals
+        // Package AI context for enhanced explanations
+        const { packageAIExplanationContext } = await import("./scheduledWorkouts");
+        const aiContext = await packageAIExplanationContext(
+            ctx,
+            args.userId,
+            activeGoal,
+            workoutIntent,
+            nutritionIntent,
+            workoutBlueprint,
+            mealPlan,
+            args.date // Pass the date being generated
+        );
+
+        // Generate explanations for workout and meals with full AI context
         const [workoutExplanation, mealExplanation] = await Promise.all([
             generateWorkoutExplanation({
-                workoutBlueprint,
-                workoutIntent,
-                activeGoal,
+                aiContext,
             }),
             generateMealExplanation({
-                mealPlan,
-                nutritionIntent,
-                activeGoal,
+                aiContext,
             }),
         ]);
 
-        // Create workout session (no planId)
-        const sessionId: Id<"workout_sessions"> = await ctx.runMutation(api.plans.createWorkoutSession, {
-            userId: args.userId,
-            date: args.date,
-            dayOfWeek: new Date(args.date).toLocaleDateString("en-US", { weekday: "long" }),
-            intensity: workoutIntent.intensity,
-            workoutExplanation,
-            mealExplanation,
-        });
+        const dayOfWeek = new Date(args.date).toLocaleDateString("en-US", { weekday: "long" });
+        let mainSessionId: Id<"workout_sessions"> | null = null;
 
-        // Create exercise sets from workout blueprint
-        for (const exerciseBlueprint of workoutBlueprint.exercises) {
-            // Find exercise by name
-            const exercise = exerciseContext.find(
-                (ex) => ex.name.toLowerCase() === exerciseBlueprint.exercise.toLowerCase()
-            );
+        // Create main workout session (if not endurance-only)
+        // For endurance goals, the workoutBlueprint is the endurance workout itself
+        console.log("[generateDailyWorkoutAndMeals] Creating main workout session, workoutType:", workoutIntent.workoutType, "exercises:", workoutBlueprint.exercises.length);
 
-            if (!exercise) {
-                throw new Error(`Exercise "${exerciseBlueprint.exercise}" not found in context`);
+        if (workoutIntent.workoutType !== "endurance" || workoutBlueprint.exercises.length > 0) {
+            // Create new session with goalId
+            mainSessionId = await ctx.runMutation(api.plans.createWorkoutSession, {
+                userId: args.userId,
+                goalId: goalId,
+                date: args.date,
+                dayOfWeek,
+                intensity: workoutIntent.intensity,
+                workoutType: workoutIntent.workoutType || "main",
+                workoutExplanation,
+                mealExplanation,
+            });
+            console.log("[generateDailyWorkoutAndMeals] Main session created:", mainSessionId);
+
+            // Create exercise sets from workout blueprint
+            console.log("[generateDailyWorkoutAndMeals] Creating", workoutBlueprint.exercises.length, "exercises");
+            let exercisesCreated = 0;
+            let setsCreated = 0;
+
+            for (const exerciseBlueprint of workoutBlueprint.exercises) {
+                // Find exercise by name
+                const exercise = exerciseContext.find(
+                    (ex: { name: string }) => ex.name.toLowerCase() === exerciseBlueprint.exercise.toLowerCase()
+                );
+
+                if (!exercise) {
+                    console.error(`[generateDailyWorkoutAndMeals] Exercise "${exerciseBlueprint.exercise}" not found in context`);
+                    console.log("[generateDailyWorkoutAndMeals] Available exercises:", exerciseContext.slice(0, 5).map((e: { name: string }) => e.name));
+                    throw new Error(`Exercise "${exerciseBlueprint.exercise}" not found in context`);
+                }
+
+                console.log(`[generateDailyWorkoutAndMeals] Creating sets for exercise: ${exerciseBlueprint.exercise} (${exerciseBlueprint.sets.length} sets)`);
+
+                // Create sets
+                for (let i = 0; i < exerciseBlueprint.sets.length; i++) {
+                    const set = exerciseBlueprint.sets[i];
+                    try {
+                        await ctx.runMutation(api.plans.createExerciseSet, {
+                            sessionId: mainSessionId,
+                            exerciseId: exercise._id,
+                            plannedWeight: set.weight,
+                            plannedReps: set.reps,
+                            setNumber: i + 1,
+                        });
+                        setsCreated++;
+                    } catch (error) {
+                        console.error(`[generateDailyWorkoutAndMeals] Failed to create set ${i + 1} for ${exerciseBlueprint.exercise}:`, error);
+                        throw error;
+                    }
+                }
+                exercisesCreated++;
             }
 
-            // Create sets
-            for (let i = 0; i < exerciseBlueprint.sets.length; i++) {
-                const set = exerciseBlueprint.sets[i];
+            console.log(`[generateDailyWorkoutAndMeals] Created ${exercisesCreated} exercises with ${setsCreated} total sets`);
+        } else {
+            // Endurance-only workout: create endurance session
+            mainSessionId = await ctx.runMutation(api.plans.createWorkoutSession, {
+                userId: args.userId,
+                goalId: goalId,
+                date: args.date,
+                dayOfWeek,
+                intensity: workoutIntent.intensity,
+                workoutType: "endurance",
+                workoutExplanation,
+                mealExplanation,
+            });
+        }
+
+        // Create SEPARATE stretch workout session if needed
+        if (workoutIntent.includeStretch && workoutIntent.stretchTemplate) {
+            const stretchSessionId = await ctx.runMutation(api.plans.createWorkoutSession, {
+                userId: args.userId,
+                goalId: goalId,
+                date: args.date,
+                dayOfWeek,
+                intensity: "maintain",
+                workoutType: "stretch",
+                workoutExplanation: `Stretch workout: ${workoutIntent.stretchTemplate}`,
+            });
+
+            // Generate stretch workout from template
+            const stretchTemplate = await ctx.runQuery(api.split_templates.getStretchWorkoutTemplateQuery, {
+                templateName: workoutIntent.stretchTemplate,
+            });
+
+            if (stretchTemplate) {
+                // Get all exercises and filter for stretches
+                const allExercises = await ctx.runQuery(api.plans.getExerciseContextForGeneration, {}) as Array<{ _id: Id<"exercises">; name: string; bodyPart: string; bodyParts?: string[]; isCompound: boolean; equipment?: string }>;
+
+                // Filter for stretch exercises (name contains "stretch", "circle", or mobility-related terms)
+                const stretchExercises = allExercises.filter(ex => {
+                    const nameLower = ex.name.toLowerCase();
+                    return nameLower.includes("stretch") ||
+                        nameLower.includes("circle") ||
+                        nameLower.includes("mobility");
+                });
+
+                console.log(`[generateDailyWorkoutAndMeals] Found ${stretchExercises.length} stretch exercises for template`);
+
+                // Create stretch exercise sets based on template
+                let setNumber = 1;
+                for (const templateExercise of stretchTemplate.exercises.slice(0, 8)) {
+                    // Find a stretch exercise that matches this body part
+                    const stretchExercise = stretchExercises.find(ex => {
+                        const exBodyPart = ex.bodyPart?.toLowerCase() || "";
+                        const exBodyParts = ex.bodyParts?.map(bp => bp.toLowerCase()) || [];
+                        const templateBodyPart = templateExercise.bodyPart.toLowerCase();
+
+                        return exBodyPart.includes(templateBodyPart) ||
+                            templateBodyPart.includes(exBodyPart) ||
+                            exBodyParts.some(bp => bp.includes(templateBodyPart) || templateBodyPart.includes(bp));
+                    });
+
+                    if (stretchExercise) {
+                        // Create a single set for stretching (duration-based, not reps)
+                        await ctx.runMutation(api.plans.createExerciseSet, {
+                            sessionId: stretchSessionId,
+                            exerciseId: stretchExercise._id,
+                            plannedWeight: 0, // No weight for stretching
+                            plannedReps: 30, // 30 seconds hold time (represented as reps)
+                            setNumber: setNumber++,
+                        });
+                        console.log(`[generateDailyWorkoutAndMeals] Added stretch: ${stretchExercise.name} for ${templateExercise.bodyPart}`);
+                    }
+                }
+            }
+        }
+
+        // Create SEPARATE cardio workout session if needed (for body composition/skill goals)
+        if (workoutIntent.includeCardio && workoutIntent.cardioType && workoutIntent.workoutType !== "endurance") {
+            const cardioSessionId = await ctx.runMutation(api.plans.createWorkoutSession, {
+                userId: args.userId,
+                goalId: goalId,
+                date: args.date,
+                dayOfWeek,
+                intensity: "maintain",
+                workoutType: "cardio",
+                workoutExplanation: `Cardio workout: ${workoutIntent.cardioType}`,
+            });
+
+            // Find cardio exercise based on type
+            const cardioExerciseContext = await ctx.runQuery(api.plans.getExerciseContextForGeneration, {
+                bodyPart: "cardio",
+            }) as Array<{ _id: Id<"exercises">; name: string; bodyPart: string; isCompound: boolean; equipment?: string }>;
+
+            let cardioExerciseName = "";
+            if (workoutIntent.cardioType === "run") {
+                cardioExerciseName = "running";
+            } else if (workoutIntent.cardioType === "incline_walk") {
+                cardioExerciseName = "incline walk";
+            } else {
+                cardioExerciseName = "walking";
+            }
+
+            const cardioExercise = cardioExerciseContext.find(
+                (ex) => ex.name.toLowerCase().includes(cardioExerciseName.toLowerCase()) ||
+                    cardioExerciseName.toLowerCase().includes(ex.name.toLowerCase())
+            );
+
+            if (cardioExercise) {
+                // Create cardio exercise set (distance/time based)
                 await ctx.runMutation(api.plans.createExerciseSet, {
-                    sessionId,
-                    exerciseId: exercise._id,
-                    plannedWeight: set.weight,
-                    plannedReps: set.reps,
-                    setNumber: i + 1,
+                    sessionId: cardioSessionId,
+                    exerciseId: cardioExercise._id,
+                    plannedWeight: 0, // No weight for cardio
+                    plannedReps: 20, // 20 minutes (represented as reps) - this would be calculated based on progression
+                    setNumber: 1,
                 });
             }
         }
@@ -3187,17 +3688,42 @@ export const generateDailyWorkoutAndMeals = action({
                 continue;
             }
 
+            if (!mainSessionId) {
+                throw new Error("Cannot create daily meals without a main workout session");
+            }
+
+            console.log("[generateDailyWorkoutAndMeals] Creating daily meal:", mealBlueprint.name);
+
             await ctx.runMutation(api.plans.createDailyMeal, {
-                sessionId,
+                sessionId: mainSessionId,
                 mealId: meal._id,
                 mealType: mealTypes[i] || "snack",
                 order: i + 1,
             });
         }
 
+        if (!mainSessionId) {
+            throw new Error("Failed to create main workout session");
+        }
+
+        // Verify the session was created and can be retrieved
+        const verifySession = await ctx.runQuery(api.plans.getWorkoutByDate, {
+            userId: args.userId,
+            date: args.date,
+        });
+
+        console.log("[generateDailyWorkoutAndMeals] ✅ Workout generation complete!", {
+            sessionId: mainSessionId,
+            date: args.date,
+            workoutType: workoutIntent.workoutType,
+            exercisesCreated: workoutBlueprint.exercises.length,
+            mealsCreated: mealPlan.meals.length,
+            sessionVerified: verifySession ? "yes" : "no"
+        });
+
         return {
             success: true,
-            sessionId,
+            sessionId: mainSessionId, // Return main session ID
             workoutIntent,
             nutritionIntent,
         };

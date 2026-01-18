@@ -41,6 +41,16 @@ export const getUserById = query({
     },
 });
 
+/**
+ * Query to get all users (for scheduled tasks)
+ */
+export const getAllUsers = query({
+    args: {},
+    handler: async (ctx) => {
+        return await ctx.db.query("users").collect();
+    },
+});
+
 export const updateUser = mutation({
     args: {
         clerkId: v.string(),
@@ -86,6 +96,79 @@ export const updateProfile = mutation({
         const user = await ctx.db.get(args.userId);
         if (!user) {
             throw new Error("User not found");
+        }
+
+        // Validate custom workout days if provided
+        if (args.preferences && typeof args.preferences === 'object') {
+            const newPreferences = args.preferences as any;
+            const customWorkoutDays = newPreferences.custom_workout_days;
+            const workoutsPerWeek = newPreferences.workout_days_per_week;
+            
+            // Get existing preferences to check against
+            const existingPreferences = user.preferences as any;
+            const existingCustomDays = existingPreferences?.custom_workout_days;
+            const existingWorkoutsPerWeek = existingPreferences?.workout_days_per_week;
+            
+            // Determine the workouts per week to validate against
+            // Use new value if provided, otherwise use existing
+            const targetWorkoutsPerWeek = workoutsPerWeek !== undefined 
+                ? workoutsPerWeek 
+                : existingWorkoutsPerWeek;
+            
+            // Determine the custom days being set
+            const daysToValidate = customWorkoutDays !== undefined 
+                ? customWorkoutDays 
+                : existingCustomDays;
+            
+            // Validate custom workout days if they exist
+            if (daysToValidate !== undefined && daysToValidate !== null) {
+                if (Array.isArray(daysToValidate) && daysToValidate.length > 0) {
+                    // Validate day numbers (0-6)
+                    const invalidDays = daysToValidate.filter((day: any) => 
+                        typeof day !== 'number' || day < 0 || day > 6
+                    );
+                    
+                    if (invalidDays.length > 0) {
+                        throw new Error(
+                            `Invalid workout days: ${invalidDays.join(', ')}. ` +
+                            `Days must be numbers between 0 (Sunday) and 6 (Saturday).`
+                        );
+                    }
+                    
+                    // Check if custom days match workouts per week preference
+                    if (targetWorkoutsPerWeek !== undefined && typeof targetWorkoutsPerWeek === 'number') {
+                        if (daysToValidate.length !== targetWorkoutsPerWeek) {
+                            throw new Error(
+                                `Custom workout days (${daysToValidate.length} days) must match ` +
+                                `your preferred workouts per week (${targetWorkoutsPerWeek} days). ` +
+                                `Please set exactly ${targetWorkoutsPerWeek} workout days or update your workouts per week preference.`
+                            );
+                        }
+                    }
+                } else if (daysToValidate !== null && daysToValidate !== undefined) {
+                    // If it's not null/undefined but also not a valid array
+                    throw new Error(
+                        `Custom workout days must be an array of day numbers (0-6) or null/empty array to use calculated schedule.`
+                    );
+                }
+            }
+            
+            // If workouts per week is being updated and custom days exist, validate
+            if (workoutsPerWeek !== undefined && typeof workoutsPerWeek === 'number') {
+                const currentCustomDays = customWorkoutDays !== undefined 
+                    ? customWorkoutDays 
+                    : existingCustomDays;
+                
+                if (currentCustomDays && Array.isArray(currentCustomDays) && currentCustomDays.length > 0) {
+                    if (currentCustomDays.length !== workoutsPerWeek) {
+                        throw new Error(
+                            `Your custom workout days (${currentCustomDays.length} days) must match ` +
+                            `the new workouts per week setting (${workoutsPerWeek} days). ` +
+                            `Please update your custom workout days to have exactly ${workoutsPerWeek} days.`
+                        );
+                    }
+                }
+            }
         }
 
         // Build update object with only provided fields

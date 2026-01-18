@@ -7,7 +7,8 @@ import { Id } from "../../../convex/_generated/dataModel";
 export interface ExerciseContext {
     _id: Id<"exercises">;
     name: string;
-    bodyPart: string;
+    bodyPart?: string; // Kept for backward compatibility
+    bodyParts: string[]; // Array of body parts
     equipment?: string;
     isCompound: boolean;
 }
@@ -39,7 +40,9 @@ export async function getExerciseContext(
     if (filters?.bodyPart) {
         const bodyPartLower = filters.bodyPart.toLowerCase();
         exercises = exercises.filter(
-            (e) => e.bodyPart.toLowerCase() === bodyPartLower
+            (e) => 
+                (e.bodyPart && e.bodyPart.toLowerCase() === bodyPartLower) ||
+                (e.bodyParts && e.bodyParts.some(bp => bp.toLowerCase() === bodyPartLower))
         );
     }
 
@@ -47,7 +50,8 @@ export async function getExerciseContext(
     return exercises.map((exercise) => ({
         _id: exercise._id,
         name: exercise.name,
-        bodyPart: exercise.bodyPart,
+        bodyPart: exercise.bodyPart || (exercise.bodyParts && exercise.bodyParts[0]) || "",
+        bodyParts: exercise.bodyParts || (exercise.bodyPart ? [exercise.bodyPart] : []),
         equipment: exercise.equipment,
         isCompound: exercise.isCompound,
     }));

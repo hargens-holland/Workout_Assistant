@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
 /* =======================
@@ -91,7 +91,7 @@ export default function GenerateProgramPage() {
     const [error, setError] = useState<string | null>(null);
     const [goalCreated, setGoalCreated] = useState(false);
 
-    const createGoal = useMutation(api.goals.createGoal);
+    const createGoal = useAction(api.goals.createGoal);
     const updateProfile = useMutation(api.users.updateProfile);
 
     const messageContainerRef = useRef<HTMLDivElement>(null);

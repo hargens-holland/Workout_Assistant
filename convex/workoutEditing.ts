@@ -12,15 +12,52 @@ export const getTodayWorkout = query({
         date: v.string(), // ISO date string (YYYY-MM-DD)
     },
     handler: async (ctx, args) => {
-        // Get session for this date
-        const session = await ctx.db
+        console.log("[getTodayWorkout] Called with:", { userId: args.userId, date: args.date });
+        
+        // Get active goal first
+        const activeGoal = await ctx.db
+            .query("goals")
+            .withIndex("by_user_and_active", (q) => 
+                q.eq("userId", args.userId).eq("isActive", true)
+            )
+            .first();
+        
+        if (!activeGoal) {
+            console.log("[getTodayWorkout] No active goal, returning null");
+            return null;
+        }
+        
+        // Get session for this date and active goal
+        const sessions = await ctx.db
             .query("workout_sessions")
             .withIndex("by_user_and_date", (q) => 
                 q.eq("userId", args.userId).eq("date", args.date)
             )
-            .first();
+            .collect();
+        
+        // Filter to get main workout session for active goal (prefer "main" type)
+        // If no session found for active goal, return null (don't show old workouts without goalId)
+        const session = sessions.find(s => s.goalId === activeGoal._id && s.workoutType === "main") ||
+                       sessions.find(s => s.goalId === activeGoal._id) ||
+                       null;
+
+        console.log("[getTodayWorkout] Session found:", session ? { 
+            _id: session._id, 
+            date: session.date, 
+            workoutType: session.workoutType,
+            intensity: session.intensity 
+        } : "null");
 
         if (!session) {
+            // Check if there are any sessions for this user at all
+            const anySessions = await ctx.db
+                .query("workout_sessions")
+                .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+                .collect();
+            console.log("[getTodayWorkout] No session for date, but user has", anySessions.length, "total sessions");
+            if (anySessions.length > 0) {
+                console.log("[getTodayWorkout] Sample session dates:", anySessions.slice(0, 3).map(s => s.date));
+            }
             return null;
         }
 
@@ -30,9 +67,14 @@ export const getTodayWorkout = query({
             .withIndex("by_session_id", (q) => q.eq("sessionId", session._id))
             .collect();
 
+        console.log("[getTodayWorkout] Found", sets.length, "sets for session");
+
         const exercises = await Promise.all(
             sets.map(async (set) => {
                 const exercise = await ctx.db.get(set.exerciseId);
+                if (!exercise) {
+                    console.warn("[getTodayWorkout] Exercise not found for set:", set.exerciseId);
+                }
                 return {
                     ...set,
                     exercise,
@@ -40,10 +82,13 @@ export const getTodayWorkout = query({
             })
         );
 
-        return {
+        const result = {
             ...session,
             exercises,
         };
+
+        console.log("[getTodayWorkout] Returning workout with", exercises.length, "exercises");
+        return result;
     },
 });
 
@@ -62,7 +107,9 @@ export const reduceWorkoutVolume = mutation({
             .collect();
 
         if (sets.length === 0) {
-            throw new Error("No sets found for this session");
+            console.log("[reduceWorkoutVolume] No sets found for session:", args.sessionId);
+            // Return success instead of throwing - empty workouts can't be reduced
+            return { success: true, message: "No sets to reduce - workout is already empty" };
         }
 
         if (args.mode === "remove_set") {
